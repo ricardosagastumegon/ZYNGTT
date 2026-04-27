@@ -1,0 +1,305 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OPERATOR
+  CLIENT
+}
+
+enum ShipmentType {
+  IMPORT
+  EXPORT
+}
+
+enum TransportMode {
+  SEA
+  AIR
+  GROUND
+}
+
+enum ShipmentStatus {
+  DRAFT
+  CONFIRMED
+  IN_TRANSIT
+  AT_CUSTOMS
+  DELIVERED
+  CANCELLED
+}
+
+enum QuoteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CONVERTED
+}
+
+enum DocumentType {
+  BILL_OF_LADING
+  COMMERCIAL_INVOICE
+  PACKING_LIST
+  CUSTOMS_DECLARATION
+  CERTIFICATE_OF_ORIGIN
+  INSURANCE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum CustomsStatus {
+  PENDING
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  RELEASED
+}
+
+enum FoodImportStatus {
+  DRAFT
+  DOCUMENTS_PENDING
+  SIGIE_READY
+  SIGIE_SUBMITTED
+  MAGA_REVIEW
+  LAB_PENDING
+  LAB_APPROVED
+  LAB_REJECTED
+  QUARANTINE
+  APPROVED
+  RELEASED
+  REJECTED
+}
+
+model Company {
+  id        String   @id @default(cuid())
+  name      String
+  taxId     String?
+  address   String?
+  phone     String?
+  country   String   @default("GT")
+  users     User[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  password      String
+  firstName     String
+  lastName      String
+  role          Role           @default(CLIENT)
+  companyId     String?
+  company       Company?       @relation(fields: [companyId], references: [id])
+  refreshTokens RefreshToken[]
+  shipments     Shipment[]
+  quotes        Quote[]
+  documents     Document[]
+  payments      Payment[]
+  foodImports   FoodImport[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model Quote {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  type        ShipmentType
+  mode        TransportMode
+  origin      String
+  destination String
+  weight      Float
+  volume      Float?
+  description String?
+  carrier     String
+  price       Float
+  currency    String        @default("USD")
+  transitDays Int
+  validUntil  DateTime
+  status      QuoteStatus   @default(PENDING)
+  shipments   Shipment[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Shipment {
+  id                String                  @id @default(cuid())
+  reference         String                  @unique
+  type              ShipmentType
+  mode              TransportMode
+  status            ShipmentStatus          @default(DRAFT)
+  origin            String
+  destination       String
+  carrier           String?
+  trackingNumber    String?
+  weight            Float?
+  volume            Float?
+  description       String?
+  estimatedDelivery DateTime?
+  actualDelivery    DateTime?
+  userId            String
+  user              User                    @relation(fields: [userId], references: [id])
+  quoteId           String?
+  quote             Quote?                  @relation(fields: [quoteId], references: [id])
+  documents         Document[]
+  trackingEvents    TrackingEvent[]
+  payment           Payment?
+  customsRecord     CustomsRecord?
+  foodImport        FoodImport?
+  statusHistory     ShipmentStatusHistory[]
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+}
+
+model ShipmentStatusHistory {
+  id         String         @id @default(cuid())
+  shipmentId String
+  shipment   Shipment       @relation(fields: [shipmentId], references: [id])
+  status     ShipmentStatus
+  notes      String?
+  createdAt  DateTime       @default(now())
+}
+
+model Document {
+  id           String       @id @default(cuid())
+  shipmentId   String
+  shipment     Shipment     @relation(fields: [shipmentId], references: [id])
+  uploadedById String
+  uploadedBy   User         @relation(fields: [uploadedById], references: [id])
+  type         DocumentType
+  name         String
+  url          String
+  publicId     String
+  size         Int
+  createdAt    DateTime     @default(now())
+}
+
+model TrackingEvent {
+  id          String   @id @default(cuid())
+  shipmentId  String
+  shipment    Shipment @relation(fields: [shipmentId], references: [id])
+  status      String
+  location    String?
+  description String
+  occurredAt  DateTime
+  createdAt   DateTime @default(now())
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  shipmentId            String        @unique
+  shipment              Shipment      @relation(fields: [shipmentId], references: [id])
+  userId                String
+  user                  User          @relation(fields: [userId], references: [id])
+  amount                Float
+  currency              String        @default("USD")
+  freightAmount         Float
+  commissionAmount      Float
+  status                PaymentStatus @default(PENDING)
+  stripePaymentIntentId String?
+  stripeInvoiceUrl      String?
+  paidAt                DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+}
+
+model CustomsRecord {
+  id           String        @id @default(cuid())
+  shipmentId   String        @unique
+  shipment     Shipment      @relation(fields: [shipmentId], references: [id])
+  hsCode       String?
+  description  String?
+  value        Float?
+  currency     String        @default("USD")
+  tariffRate   Float?
+  agent        String?
+  status       CustomsStatus @default(PENDING)
+  observations String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model FoodImport {
+  id                   String           @id @default(cuid())
+  shipmentId           String           @unique
+  shipment             Shipment         @relation(fields: [shipmentId], references: [id])
+  userId               String
+  user                 User             @relation(fields: [userId], references: [id])
+
+  // CFDI data
+  cfdiData             Json
+  cfdiVersion          String           @default("4.0")
+  cfdiFolio            String
+  cfdiSerie            String?
+  cfdiFecha            String
+  exporterRFC          String
+  exporterName         String
+  importerRFC          String
+  importerNIT          String
+  importerName         String
+
+  // Product / HS
+  hsCode               String
+  productDescription   String
+
+  // Values
+  commercialValueUSD   Float
+  incoterm             String           @default("FOB")
+  freightCostUSD       Float            @default(350)
+  insuranceCostUSD     Float
+  cifValueUSD          Float
+  cifValueGTQ          Float
+  exchangeRate         Float            @default(7.75)
+
+  // Tributes
+  daiRate              Float
+  daiAmountGTQ         Float
+  ivaAmountGTQ         Float
+  totalTributesGTQ     Float
+
+  // MAGA requirements
+  requiresFitosanitario Boolean         @default(false)
+  requiresZoosanitario  Boolean         @default(false)
+  requiresLab           Boolean         @default(false)
+  requiresQuarantine    Boolean         @default(false)
+  quarantineDays        Int?
+  labType               String?
+  estimatedProcessDays  Int             @default(10)
+
+  // Process tracking
+  pointOfEntry         String
+  expectedArrivalDate  DateTime?
+  sigieRequestNumber   String?
+  sigieSubmittedAt     DateTime?
+  labResult            String?
+  labResultDate        DateTime?
+  quarantineStart      DateTime?
+  quarantineEnd        DateTime?
+  releasedAt           DateTime?
+  observations         String?
+
+  status               FoodImportStatus @default(DRAFT)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}

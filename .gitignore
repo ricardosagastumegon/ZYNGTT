@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+.turbo/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Prisma local DB
+apps/api/prisma/dev.db
+apps/api/prisma/dev.db-journal
+apps/api/prisma/prisma/
+
+# Playwright browsers
+**/ms-playwright/
+
+# Testing
+coverage/
+.nyc_output/
