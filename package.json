@@ -8,6 +8,8 @@
   ],
   "scripts": {
     "build": "turbo run build",
+    "build:api": "npm run build --workspace=apps/api",
+    "start": "node apps/api/dist/index.js",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "test": "turbo run test",
