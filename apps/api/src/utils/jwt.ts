@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
@@ -15,7 +16,11 @@ export function generateToken(payload: JwtPayload): string {
 }
 
 export function generateRefreshToken(payload: JwtPayload): string {
-  return jwt.sign(payload, REFRESH_SECRET, { expiresIn: '30d' } as jwt.SignOptions);
+  return jwt.sign(
+    { ...payload, jti: crypto.randomUUID() },
+    REFRESH_SECRET,
+    { expiresIn: '30d' } as jwt.SignOptions,
+  );
 }
 
 export function verifyToken(token: string): JwtPayload {
