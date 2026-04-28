@@ -4,6 +4,6 @@ import { useEffect } from 'react';
 
 export default function EmpresaDashboard() {
   const router = useRouter();
-  useEffect(() => { router.replace('/dashboard/dashboard'); }, [router]);
+  useEffect(() => { router.replace('/dashboard'); }, [router]);
   return null;
 }
