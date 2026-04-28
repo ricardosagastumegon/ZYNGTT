@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, FoodImportStatus } from '@prisma/client';
 import { parseCFDI } from './cfdi-parser.service';
 import {
   getMAGARequirements,
@@ -165,7 +165,7 @@ export const foodImportService = {
     return prisma.foodImport.update({
       where: { id },
       data: {
-        status,
+        status: status as FoodImportStatus,
         ...(notes && { observations: notes }),
         ...(status === 'SIGIE_SUBMITTED' && { sigieSubmittedAt: new Date() }),
         ...(status === 'LAB_APPROVED' && { labResult: 'APPROVED', labResultDate: new Date() }),

@@ -77,7 +77,15 @@ export async function createConstanciaVegetal(
     // Select request type — Constancia Fitosanitaria de Importación
     const tipoSelect = page.locator('select[name="tipoSolicitud"], #tipoSolicitud');
     if (await tipoSelect.count() > 0) {
-      await tipoSelect.selectOption({ label: /Constancia.*Vegetal|Fitosanitaria.*Importaci/i });
+      // Playwright selectOption only accepts string labels; find option by keyword via evaluate
+      await page.evaluate(() => {
+        const sel = document.querySelector<HTMLSelectElement>('select[name="tipoSolicitud"], #tipoSolicitud');
+        if (!sel) return;
+        const opt = Array.from(sel.options).find(o =>
+          /constancia.*vegetal|fitosanitaria.*import/i.test(o.text)
+        );
+        if (opt) sel.value = opt.value;
+      });
     }
 
     // NIT importador
@@ -99,7 +107,12 @@ export async function createConstanciaVegetal(
     const paisSelect = page.locator('select[name="paisOrigen"], select[name="pais"]');
     if (await paisSelect.count() > 0) {
       await paisSelect.selectOption({ value: 'MX' }).catch(() =>
-        paisSelect.selectOption({ label: /México|Mexico/i }),
+        page.evaluate(() => {
+          const sel = document.querySelector<HTMLSelectElement>('select[name="paisOrigen"], select[name="pais"]');
+          if (!sel) return;
+          const opt = Array.from(sel.options).find(o => /m[eé]xico/i.test(o.text));
+          if (opt) sel.value = opt.value;
+        })
       );
     }
 
@@ -130,7 +143,13 @@ export async function createConstanciaVegetal(
     // Aduana de ingreso
     const aduanaSelect = page.locator('select[name="aduana"], select[name="puertoIngreso"]');
     if (await aduanaSelect.count() > 0) {
-      await aduanaSelect.selectOption({ label: new RegExp(formData.ingresoAduana.split(' ')[0], 'i') }).catch(() => {});
+      const keyword = formData.ingresoAduana.split(' ')[0];
+      await page.evaluate((kw) => {
+        const sel = document.querySelector<HTMLSelectElement>('select[name="aduana"], select[name="puertoIngreso"]');
+        if (!sel) return;
+        const opt = Array.from(sel.options).find(o => o.text.toLowerCase().includes(kw.toLowerCase()));
+        if (opt) sel.value = opt.value;
+      }, keyword).catch(() => {});
     }
 
     // Fecha estimada de ingreso
@@ -149,19 +168,19 @@ export async function createConstanciaVegetal(
     // Extract request number
     const requestNumber = await extractRequestNumber(page);
 
-    const screenshot = await page.screenshot({ encoding: 'base64' });
+    const screenshotBuf = await page.screenshot();
 
     return {
       success: true,
       requestNumber,
-      screenshotBase64: screenshot as string,
+      screenshotBase64: screenshotBuf.toString('base64'),
     };
   } catch (err) {
-    const screenshot = await page.screenshot({ encoding: 'base64' }).catch(() => undefined);
+    const screenshotBuf = await page.screenshot().catch(() => undefined);
     return {
       success: false,
       errorMessage: err instanceof Error ? err.message : String(err),
-      screenshotBase64: screenshot as string | undefined,
+      screenshotBase64: screenshotBuf?.toString('base64'),
     };
   }
 }

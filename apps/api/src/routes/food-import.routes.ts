@@ -48,7 +48,7 @@ router.post(
 
     const result = await foodImportService.parseCFDIAndCreate(
       { ...body, cfdiXml },
-      req.user!.id,
+      req.user!.userId,
     );
 
     res.status(201).json({ success: true, data: result });
@@ -62,7 +62,7 @@ router.get(
   asyncHandler(async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
-    const result = await foodImportService.listFoodImports(req.user!.id, page, limit);
+    const result = await foodImportService.listFoodImports(req.user!.userId, page, limit);
     res.json({ success: true, data: result });
   }),
 );
@@ -72,7 +72,7 @@ router.get(
   '/:id',
   authenticate,
   asyncHandler(async (req: Request, res: Response) => {
-    const result = await foodImportService.getFoodImport(req.params.id, req.user!.id);
+    const result = await foodImportService.getFoodImport(req.params.id, req.user!.userId);
     res.json({ success: true, data: result });
   }),
 );
@@ -83,7 +83,7 @@ router.patch(
   authenticate,
   asyncHandler(async (req: Request, res: Response) => {
     const { status, notes } = statusSchema.parse(req.body);
-    const result = await foodImportService.updateStatus(req.params.id, req.user!.id, status, notes);
+    const result = await foodImportService.updateStatus(req.params.id, req.user!.userId, status, notes);
     res.json({ success: true, data: result });
   }),
 );
@@ -93,7 +93,7 @@ router.get(
   '/:id/sigie-form',
   authenticate,
   asyncHandler(async (req: Request, res: Response) => {
-    const result = await foodImportService.generateSIGIEFormData(req.params.id, req.user!.id);
+    const result = await foodImportService.generateSIGIEFormData(req.params.id, req.user!.userId);
     res.json({ success: true, data: result });
   }),
 );
@@ -104,7 +104,7 @@ router.post(
   authenticate,
   asyncHandler(async (req: Request, res: Response) => {
     const { sigieRequestNumber } = z.object({ sigieRequestNumber: z.string().min(1) }).parse(req.body);
-    const result = await foodImportService.saveSIGIERequestNumber(req.params.id, req.user!.id, sigieRequestNumber);
+    const result = await foodImportService.saveSIGIERequestNumber(req.params.id, req.user!.userId, sigieRequestNumber);
     res.json({ success: true, data: result });
   }),
 );
@@ -121,7 +121,7 @@ router.post(
     });
     const { incoterm, freightCostUSD, insuranceCostUSD } = schema.parse(req.body);
     const result = await foodImportService.recalculateTributes(
-      req.params.id, req.user!.id, incoterm, freightCostUSD, insuranceCostUSD,
+      req.params.id, req.user!.userId, incoterm, freightCostUSD, insuranceCostUSD,
     );
     res.json({ success: true, data: result });
   }),
@@ -142,7 +142,7 @@ router.post(
   '/:id/sigie-submit',
   authenticate,
   asyncHandler(async (req: Request, res: Response) => {
-    const result = await foodImportService.submitToSIGIE(req.params.id, req.user!.id);
+    const result = await foodImportService.submitToSIGIE(req.params.id, req.user!.userId);
     res.json({ success: result.success, data: result });
   }),
 );
@@ -152,7 +152,7 @@ router.post(
   '/:id/sigie-sync',
   authenticate,
   asyncHandler(async (req: Request, res: Response) => {
-    const result = await foodImportService.syncSIGIEStatus(req.params.id, req.user!.id);
+    const result = await foodImportService.syncSIGIEStatus(req.params.id, req.user!.userId);
     res.json({ success: true, data: result });
   }),
 );
