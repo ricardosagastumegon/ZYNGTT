@@ -3,17 +3,17 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const viewport: Viewport = {
-  themeColor: '#4F46E5',
+  themeColor: '#1e3a5f',
 };
 
 export const metadata: Metadata = {
-  title: 'AXON LOGISTIC — Logística Digital Centroamérica',
+  title: 'ZYN — Logística Digital Centroamérica',
   description: 'Plataforma SaaS para gestión de importaciones y exportaciones MX→GT. Tracking en tiempo real, documentación automática y gestión aduanera digital.',
   keywords: 'logística, importación, exportación, aduanas, Guatemala, México, SIGIE, MAGA, DUCA',
-  authors: [{ name: 'AXON LOGISTIC' }],
+  authors: [{ name: 'ZYN' }],
   manifest: '/manifest.json',
   openGraph: {
-    title: 'AXON LOGISTIC',
+    title: 'ZYN',
     description: 'Logística inteligente para Centroamérica',
     type: 'website',
     locale: 'es_GT',
