@@ -24,7 +24,8 @@ export default function LoginPage() {
     try {
       await login(data.email, data.password);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Credenciales incorrectas';
+      const axiosError = e as { response?: { data?: { error?: string } } };
+      const msg = axiosError?.response?.data?.error ?? (e instanceof Error ? e.message : 'Credenciales incorrectas');
       setError(msg);
     }
   };
