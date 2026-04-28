@@ -112,7 +112,7 @@ export default function NewQuotePage() {
         {step === 2 && result && (
           <div>
             <h3 className="font-semibold text-gray-700 mb-4">Resultado de cotización</h3>
-            <QuoteCard quote={result as Parameters<typeof QuoteCard>[0]['quote']} />
+            <QuoteCard quote={result as unknown as Parameters<typeof QuoteCard>[0]['quote']} />
             <button type="button" onClick={() => { setStep(0); setResult(null); }} className="w-full mt-4 border border-gray-300 text-gray-600 py-2.5 rounded-lg text-sm">Nueva cotización</button>
           </div>
         )}
