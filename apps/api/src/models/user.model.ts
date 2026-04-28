@@ -36,7 +36,11 @@ export const userModel = {
     prisma.user.update({ where: { id }, data }),
 
   saveRefreshToken: (userId: string, token: string, expiresAt: Date) =>
-    prisma.refreshToken.create({ data: { userId, token, expiresAt } }),
+    prisma.refreshToken.upsert({
+      where: { token },
+      update: { userId, expiresAt },
+      create: { userId, token, expiresAt },
+    }),
 
   findRefreshToken: (token: string) =>
     prisma.refreshToken.findUnique({ where: { token }, include: { user: true } }),
