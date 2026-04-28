@@ -1,0 +1,86 @@
+import { Router } from 'express';
+import { authenticate } from '../middleware/auth';
+import { requireRole } from '../middleware/role.middleware';
+import { asyncHandler } from '../middleware/asyncHandler';
+import { importExpedienteService } from '../services/import-expediente.service';
+import multer from 'multer';
+import { z } from 'zod';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const router = Router();
+
+router.use(authenticate);
+
+// POST /api/import/parse-cfdi/:shipmentId — Parsear CFDI XML y crear expediente
+router.post('/parse-cfdi/:shipmentId', upload.single('cfdi'), asyncHandler(async (req, res) => {
+  if (!req.file) throw new Error('Archivo CFDI requerido');
+  const data = await importExpedienteService.parseCFDIAndCreate(
+    req.params.shipmentId, req.file.buffer, req.user!.userId
+  );
+  res.status(201).json({ success: true, data });
+}));
+
+// POST /api/import/transport/:id — Agregar datos de transporte
+const transportSchema = z.object({
+  transporteEmpresa: z.string().optional(),
+  transporteCAAT: z.string().optional(),
+  pilotoNombre: z.string().optional(),
+  pilotoLicencia: z.string().optional(),
+  cabezalPlaca: z.string().optional(),
+  cabezalTarjeta: z.string().optional(),
+  furgonPlaca: z.string().optional(),
+  furgonTarjeta: z.string().optional(),
+  numEconomico: z.string().optional(),
+  fleteCosto: z.number().optional(),
+  aduanaSalidaMX: z.string().optional(),
+  aduanaEntradaGT: z.string().optional(),
+  fechaCruce: z.string().optional(),
+});
+
+router.post('/transport/:id', asyncHandler(async (req, res) => {
+  const data = transportSchema.parse(req.body);
+  const result = await importExpedienteService.addTransportData(req.params.id, data, req.user!.userId);
+  res.json({ success: true, data: result });
+}));
+
+// POST /api/import/generate-docs/:id — Generar PDFs y subir a Cloudinary
+router.post('/generate-docs/:id', asyncHandler(async (req, res) => {
+  const result = await importExpedienteService.generateDocuments(req.params.id, req.user!.userId);
+  res.json({ success: true, data: result });
+}));
+
+// POST /api/import/fito-mx/:id — Subir fitosanitario MX
+router.post('/fito-mx/:id', upload.single('fito'), asyncHandler(async (req, res) => {
+  if (!req.file) throw new Error('Archivo requerido');
+  const result = await importExpedienteService.uploadFitoMX(
+    req.params.id, req.file.buffer, req.file.originalname, req.user!.userId
+  );
+  res.json({ success: true, data: result });
+}));
+
+// POST /api/import/lab/:id — Subir resultado de laboratorio
+router.post('/lab/:id', upload.single('lab'), asyncHandler(async (req, res) => {
+  if (!req.file) throw new Error('Archivo requerido');
+  const result = await importExpedienteService.uploadLab(req.params.id, req.file.buffer, req.user!.userId);
+  res.json({ success: true, data: result });
+}));
+
+// GET /api/import/list — Listar expedientes
+router.get('/list', asyncHandler(async (req, res) => {
+  const data = await importExpedienteService.list(req.user!.userId, req.user!.role);
+  res.json({ success: true, data });
+}));
+
+// GET /api/import/:id/tributes — Recalcular tributos
+router.get('/:id/tributes', asyncHandler(async (req, res) => {
+  const data = await importExpedienteService.calculateTributes(req.params.id, req.user!.userId);
+  res.json({ success: true, data });
+}));
+
+// GET /api/import/:id — Detalle completo del expediente
+router.get('/:id', asyncHandler(async (req, res) => {
+  const data = await importExpedienteService.getFullExpediente(req.params.id, req.user!.userId);
+  res.json({ success: true, data });
+}));
+
+export default router;

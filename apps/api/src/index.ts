@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import { initEnv } from './utils/env-validator';
+initEnv();
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -14,6 +16,9 @@ import { paymentRoutes } from './routes/payment.routes';
 import { customsRoutes } from './routes/customs.routes';
 import { statsRoutes } from './routes/stats.routes';
 import foodImportRoutes from './routes/food-import.routes';
+import importExpedienteRoutes from './routes/import-expediente.routes';
+import automationRoutes from './routes/automation.routes';
+import { startStatusPoller } from './jobs/status-poller';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -52,9 +57,14 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/customs', customsRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/food-imports', foodImportRoutes);
+app.use('/api/import', importExpedienteRoutes);
+app.use('/api/automation', automationRoutes);
 
 app.use(errorHandler);
 
-app.listen(PORT, () => console.log(`ZYN API running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`ZYN API running on port ${PORT}`);
+  if (process.env.NODE_ENV !== 'test') startStatusPoller();
+});
 
 export default app;

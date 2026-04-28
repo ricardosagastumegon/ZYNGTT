@@ -1,0 +1,19 @@
+{
+  "name": "AXON LOGISTIC — Logística Digital",
+  "short_name": "AXON",
+  "description": "Plataforma de logística y comercio exterior para Centroamérica",
+  "theme_color": "#4F46E5",
+  "background_color": "#FFFFFF",
+  "display": "standalone",
+  "orientation": "portrait",
+  "scope": "/",
+  "start_url": "/dashboard",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

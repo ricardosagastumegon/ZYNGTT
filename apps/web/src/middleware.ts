@@ -1,16 +1,24 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/register', '/tracking', '/customs/guide'];
+const PUBLIC_PATHS = ['/', '/login', '/register', '/tracking', '/customs/guide'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
-  const token = request.cookies.get('axon_token')?.value;
+  const isPublic = PUBLIC_PATHS.some((p) =>
+    p === '/' ? pathname === '/' : pathname.startsWith(p)
+  );
+
+  const token =
+    request.cookies.get('axon_token')?.value ||
+    request.cookies.get('zyn_token')?.value;
 
   if (!isPublic && !token) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    url.searchParams.set('from', pathname);
+    return NextResponse.redirect(url);
   }
 
   if (token && (pathname === '/login' || pathname === '/register')) {
@@ -20,4 +28,8 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'] };
+export const config = {
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.svg$|.*\\.png$|.*\\.ico$).*)',
+  ],
+};

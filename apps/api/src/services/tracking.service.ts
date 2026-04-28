@@ -24,6 +24,20 @@ export const trackingService = {
     return { reference: shipment.reference, status: shipment.status, origin: shipment.origin, destination: shipment.destination, events };
   },
 
+  async trackPublic(trackingNumber: string) {
+    const shipment = await prisma.shipment.findFirst({
+      where: { trackingNumber },
+      select: { status: true, estimatedDelivery: true, trackingEvents: { orderBy: { occurredAt: 'desc' }, take: 1, select: { location: true, occurredAt: true } } },
+    });
+    if (!shipment) throw new AppError('Número de tracking no encontrado', 404);
+    return {
+      status: shipment.status,
+      estimatedArrival: shipment.estimatedDelivery,
+      lastLocation: shipment.trackingEvents[0]?.location ?? null,
+      lastUpdate: shipment.trackingEvents[0]?.occurredAt ?? null,
+    };
+  },
+
   async addManualEvent(shipmentId: string, status: string, description: string, location?: string) {
     return prisma.trackingEvent.create({
       data: { shipmentId, status, description, location, occurredAt: new Date() },

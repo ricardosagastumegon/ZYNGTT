@@ -8,9 +8,11 @@ datasource db {
 }
 
 enum Role {
+  EMPRESA
+  TRANSPORTISTA
+  AGENTE
   ADMIN
-  OPERATOR
-  CLIENT
+  SUPERADMIN
 }
 
 enum ShipmentType {
@@ -81,6 +83,20 @@ enum FoodImportStatus {
   REJECTED
 }
 
+// Status del expediente de importación MX→GT
+enum ExpedienteStatus {
+  CFDI_PENDIENTE
+  DOCS_GENERADOS
+  SIGIE_SOLICITADO
+  SIGIE_APROBADO
+  DUCA_LISTA
+  DUCA_TRANSMITIDA
+  SEMAFORO_VERDE
+  SEMAFORO_ROJO
+  LIBERADA
+  RECHAZADA
+}
+
 model Company {
   id        String   @id @default(cuid())
   name      String
@@ -94,22 +110,24 @@ model Company {
 }
 
 model User {
-  id            String         @id @default(cuid())
-  email         String         @unique
-  password      String
-  firstName     String
-  lastName      String
-  role          Role           @default(CLIENT)
-  companyId     String?
-  company       Company?       @relation(fields: [companyId], references: [id])
-  refreshTokens RefreshToken[]
-  shipments     Shipment[]
-  quotes        Quote[]
-  documents     Document[]
-  payments      Payment[]
-  foodImports   FoodImport[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  id              String            @id @default(cuid())
+  email           String            @unique
+  password        String
+  firstName       String
+  lastName        String
+  role            Role              @default(EMPRESA)
+  companyId       String?
+  company         Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  refreshTokens   RefreshToken[]
+  shipments       Shipment[]
+  quotes          Quote[]
+  documents       Document[]
+  payments        Payment[]
+  foodImports     FoodImport[]
+  expedientes     ImportExpediente[]
+  credentials     UserCredentials[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 }
 
 model RefreshToken {
@@ -124,7 +142,7 @@ model RefreshToken {
 model Quote {
   id          String        @id @default(cuid())
   userId      String
-  user        User          @relation(fields: [userId], references: [id])
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   type        ShipmentType
   mode        TransportMode
   origin      String
@@ -141,6 +159,9 @@ model Quote {
   shipments   Shipment[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }
 
 model Shipment {
@@ -159,59 +180,73 @@ model Shipment {
   estimatedDelivery DateTime?
   actualDelivery    DateTime?
   userId            String
-  user              User                    @relation(fields: [userId], references: [id])
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   quoteId           String?
-  quote             Quote?                  @relation(fields: [quoteId], references: [id])
+  quote             Quote?                  @relation(fields: [quoteId], references: [id], onDelete: SetNull)
   documents         Document[]
   trackingEvents    TrackingEvent[]
   payment           Payment?
   customsRecord     CustomsRecord?
   foodImport        FoodImport?
+  expediente        ImportExpediente?
   statusHistory     ShipmentStatusHistory[]
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([trackingNumber])
+  @@index([userId, status])
+  @@index([createdAt])
 }
 
 model ShipmentStatusHistory {
   id         String         @id @default(cuid())
   shipmentId String
-  shipment   Shipment       @relation(fields: [shipmentId], references: [id])
+  shipment   Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   status     ShipmentStatus
   notes      String?
   createdAt  DateTime       @default(now())
+
+  @@index([shipmentId])
 }
 
 model Document {
   id           String       @id @default(cuid())
   shipmentId   String
-  shipment     Shipment     @relation(fields: [shipmentId], references: [id])
+  shipment     Shipment     @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   uploadedById String
-  uploadedBy   User         @relation(fields: [uploadedById], references: [id])
+  uploadedBy   User         @relation(fields: [uploadedById], references: [id], onDelete: Cascade)
   type         DocumentType
   name         String
   url          String
-  publicId     String
+  publicId     String       @unique
   size         Int
   createdAt    DateTime     @default(now())
+
+  @@index([shipmentId])
+  @@index([uploadedById])
 }
 
 model TrackingEvent {
   id          String   @id @default(cuid())
   shipmentId  String
-  shipment    Shipment @relation(fields: [shipmentId], references: [id])
+  shipment    Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   status      String
   location    String?
   description String
   occurredAt  DateTime
   createdAt   DateTime @default(now())
+
+  @@index([shipmentId])
 }
 
 model Payment {
   id                    String        @id @default(cuid())
   shipmentId            String        @unique
-  shipment              Shipment      @relation(fields: [shipmentId], references: [id])
+  shipment              Shipment      @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   userId                String
-  user                  User          @relation(fields: [userId], references: [id])
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   amount                Float
   currency              String        @default("USD")
   freightAmount         Float
@@ -222,12 +257,16 @@ model Payment {
   paidAt                DateTime?
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model CustomsRecord {
   id           String        @id @default(cuid())
   shipmentId   String        @unique
-  shipment     Shipment      @relation(fields: [shipmentId], references: [id])
+  shipment     Shipment      @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
   hsCode       String?
   description  String?
   value        Float?
@@ -238,68 +277,186 @@ model CustomsRecord {
   observations String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
+
+  @@index([shipmentId])
 }
 
 model FoodImport {
-  id                   String           @id @default(cuid())
-  shipmentId           String           @unique
-  shipment             Shipment         @relation(fields: [shipmentId], references: [id])
-  userId               String
-  user                 User             @relation(fields: [userId], references: [id])
+  id                    String           @id @default(cuid())
+  shipmentId            String           @unique
+  shipment              Shipment         @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // CFDI data
-  cfdiData             Json
-  cfdiVersion          String           @default("4.0")
-  cfdiFolio            String
-  cfdiSerie            String?
-  cfdiFecha            String
-  exporterRFC          String
-  exporterName         String
-  importerRFC          String
-  importerNIT          String
-  importerName         String
+  cfdiData              Json
+  cfdiVersion           String           @default("4.0")
+  cfdiFolio             String
+  cfdiSerie             String?
+  cfdiFecha             String
+  exporterRFC           String
+  exporterName          String
+  importerRFC           String
+  importerNIT           String
+  importerName          String
 
-  // Product / HS
-  hsCode               String
-  productDescription   String
+  hsCode                String
+  productDescription    String
 
-  // Values
-  commercialValueUSD   Float
-  incoterm             String           @default("FOB")
-  freightCostUSD       Float            @default(350)
-  insuranceCostUSD     Float
-  cifValueUSD          Float
-  cifValueGTQ          Float
-  exchangeRate         Float            @default(7.75)
+  commercialValueUSD    Float
+  incoterm              String           @default("FOB")
+  freightCostUSD        Float            @default(350)
+  insuranceCostUSD      Float
+  cifValueUSD           Float
+  cifValueGTQ           Float
+  exchangeRate          Float            @default(7.75)
 
-  // Tributes
-  daiRate              Float
-  daiAmountGTQ         Float
-  ivaAmountGTQ         Float
-  totalTributesGTQ     Float
+  daiRate               Float
+  daiAmountGTQ          Float
+  ivaAmountGTQ          Float
+  totalTributesGTQ      Float
 
-  // MAGA requirements
-  requiresFitosanitario Boolean         @default(false)
-  requiresZoosanitario  Boolean         @default(false)
-  requiresLab           Boolean         @default(false)
-  requiresQuarantine    Boolean         @default(false)
+  requiresFitosanitario Boolean          @default(false)
+  requiresZoosanitario  Boolean          @default(false)
+  requiresLab           Boolean          @default(false)
+  requiresQuarantine    Boolean          @default(false)
   quarantineDays        Int?
   labType               String?
-  estimatedProcessDays  Int             @default(10)
+  estimatedProcessDays  Int              @default(10)
 
-  // Process tracking
-  pointOfEntry         String
-  expectedArrivalDate  DateTime?
-  sigieRequestNumber   String?
-  sigieSubmittedAt     DateTime?
-  labResult            String?
-  labResultDate        DateTime?
-  quarantineStart      DateTime?
-  quarantineEnd        DateTime?
-  releasedAt           DateTime?
-  observations         String?
+  pointOfEntry          String
+  expectedArrivalDate   DateTime?
+  sigieRequestNumber    String?          @unique
+  sigieSubmittedAt      DateTime?
+  sigieApproved         Boolean          @default(false)
+  sigieApprovedAt       DateTime?
+  labResult             String?
+  labResultDate         DateTime?
+  quarantineStart       DateTime?
+  quarantineEnd         DateTime?
+  releasedAt            DateTime?
+  observations          String?
 
-  status               FoodImportStatus @default(DRAFT)
-  createdAt            DateTime         @default(now())
-  updatedAt            DateTime         @updatedAt
+  status                FoodImportStatus @default(DRAFT)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([shipmentId])
+}
+
+model ImportExpediente {
+  id                String            @id @default(cuid())
+  shipmentId        String            @unique
+  shipment          Shipment          @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // CFDI
+  cfdiUUID          String?
+  cfdiFolio         String?
+  cfdiXmlUrl        String?
+  cfdiPdfUrl        String?
+
+  // Exportador (MX)
+  expNombre         String
+  expRFC            String
+  expCURP           String?
+  expDireccion      String?
+
+  // Importador (GT)
+  impNombre         String
+  impNIT            String?
+  impIdFiscal       String?
+  impDireccion      String?
+
+  // Comercial
+  incoterm          String
+  moneda            String            @default("USD")
+  tipoCambio        Float?
+  totalUSD          Float
+  mercancias        Json
+  pesoTotalKG       Float
+
+  // Transporte
+  transporteEmpresa String?
+  transporteCAAT    String?
+  pilotoNombre      String?
+  pilotoLicencia    String?
+  cabezalPlaca      String?
+  cabezalTarjeta    String?
+  furgonPlaca       String?
+  furgonTarjeta     String?
+  numEconomico      String?
+  fleteCosto        Float?
+
+  // Aduanas
+  aduanaSalidaMX    String            @default("ADUANA SUCHIATE II")
+  aduanaEntradaGT   String            @default("ADUANA TECUN UMAN II")
+  fechaCruce        DateTime?
+  cartaPorteNum     String?
+  manifiestoNum     String?
+  packingListNum    String?
+
+  // URLs documentos generados
+  cartaPorteMXUrl   String?
+  cartaPorteGTUrl   String?
+  packingListUrl    String?
+
+  // Fitosanitario MX
+  fitoMXNumero      String?
+  fitoMXFecha       DateTime?
+  fitoMXUrl         String?
+  fitoMXDeclaracion String?
+
+  // Lab
+  labRequerido      Boolean           @default(false)
+  labNombre         String?
+  labRegistro       String?
+  labPlaga          String?
+  labResultado      String?
+  labUrl            String?
+
+  // SIGIE/MAGA
+  sigieCredUser     String?
+  sigieCredPass     String?
+  sigieNumSolicitud String?           @unique
+  sigieStatus       String            @default("PENDIENTE")
+  sigieAprobadoAt   DateTime?
+  sigiePermitUrl    String?
+
+  // SAT Guatemala
+  ducaDNumero       String?
+  satOrdenNumero    String?
+  satSemaforo       String?
+  satTransmitidaAt  DateTime?
+  satLiberadaAt     DateTime?
+
+  // Tributos
+  cifUSD            Float?
+  daiTotal          Float?
+  ivaTotal          Float?
+  totalTributos     Float?
+
+  status            ExpedienteStatus  @default(CFDI_PENDIENTE)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([shipmentId])
+}
+
+model UserCredentials {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  system    String
+  username  String
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, system])
+  @@index([userId])
 }

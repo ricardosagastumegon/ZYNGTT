@@ -2,15 +2,23 @@ import { Router } from 'express';
 import { trackingService } from '../services/tracking.service';
 import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
+import { trackingLimiter } from '../middleware/rateLimiter';
 
 export const trackingRoutes = Router();
+
+// Endpoint público — devuelve solo status, location, estimatedArrival (sin IDs internos ni datos de cliente)
+trackingRoutes.get('/public/:trackingNumber', trackingLimiter, asyncHandler(async (req, res) => {
+  const data = await trackingService.trackPublic(req.params.trackingNumber);
+  res.json({ success: true, data });
+}));
+
+// Todas las rutas de abajo requieren autenticación
+trackingRoutes.use(authenticate);
 
 trackingRoutes.get('/:trackingNumber', asyncHandler(async (req, res) => {
   const data = await trackingService.trackByNumber(req.params.trackingNumber);
   res.json({ success: true, data });
 }));
-
-trackingRoutes.use(authenticate);
 
 trackingRoutes.get('/shipment/:shipmentId', asyncHandler(async (req, res) => {
   const events = await trackingService.getEvents(req.params.shipmentId, req.user!.userId);
