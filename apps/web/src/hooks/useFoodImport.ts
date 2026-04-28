@@ -58,7 +58,7 @@ export function useFoodImports(page = 1, limit = 10) {
   return useQuery({
     queryKey: ['food-imports', page, limit],
     queryFn: async () => {
-      const { data } = await api.get(`/food-imports?page=${page}&limit=${limit}`);
+      const { data } = await api.get(`/api/food-imports?page=${page}&limit=${limit}`);
       return data.data as { items: FoodImportRecord[]; total: number; page: number; limit: number };
     },
   });
@@ -68,7 +68,7 @@ export function useFoodImport(id: string) {
   return useQuery({
     queryKey: ['food-imports', id],
     queryFn: async () => {
-      const { data } = await api.get(`/food-imports/${id}`);
+      const { data } = await api.get(`/api/food-imports/${id}`);
       return data.data as FoodImportRecord;
     },
     enabled: !!id,
@@ -79,7 +79,7 @@ export function useCreateFoodImport() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (formData: FormData) => {
-      const { data } = await api.post('/food-imports', formData, {
+      const { data } = await api.post('/api/food-imports', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       return data.data as FoodImportRecord;
@@ -92,7 +92,7 @@ export function useUpdateFoodImportStatus() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async ({ id, status, notes }: { id: string; status: string; notes?: string }) => {
-      const { data } = await api.patch(`/food-imports/${id}/status`, { status, notes });
+      const { data } = await api.patch(`/api/food-imports/${id}/status`, { status, notes });
       return data.data as FoodImportRecord;
     },
     onSuccess: (_data, vars) => {
@@ -106,7 +106,7 @@ export function useSIGIEForm(id: string, enabled = false) {
   return useQuery({
     queryKey: ['food-imports', id, 'sigie-form'],
     queryFn: async () => {
-      const { data } = await api.get(`/food-imports/${id}/sigie-form`);
+      const { data } = await api.get(`/api/food-imports/${id}/sigie-form`);
       return data.data;
     },
     enabled: !!id && enabled,
@@ -119,7 +119,7 @@ export function useRecalculateTributes() {
     mutationFn: async ({
       id, incoterm, freightCostUSD, insuranceCostUSD,
     }: { id: string; incoterm: string; freightCostUSD: number; insuranceCostUSD?: number }) => {
-      const { data } = await api.post(`/food-imports/${id}/recalculate`, {
+      const { data } = await api.post(`/api/food-imports/${id}/recalculate`, {
         incoterm, freightCostUSD, insuranceCostUSD,
       });
       return data.data;
