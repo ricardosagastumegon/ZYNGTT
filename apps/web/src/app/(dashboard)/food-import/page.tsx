@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useFoodImports } from '../../../hooks/useFoodImport';
+import { useFoodImports } from '@/hooks/useFoodImport';
 import { useState } from 'react';
 
 const STATUS_COLORS: Record<string, string> = {

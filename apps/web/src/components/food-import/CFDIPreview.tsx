@@ -1,6 +1,6 @@
 'use client';
 
-import { FoodImportRecord } from '../../hooks/useFoodImport';
+import { FoodImportRecord } from '@/hooks/useFoodImport';
 
 interface Props {
   record: FoodImportRecord;

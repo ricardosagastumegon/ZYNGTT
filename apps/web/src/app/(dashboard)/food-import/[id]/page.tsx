@@ -1,10 +1,10 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useFoodImport, useUpdateFoodImportStatus } from '../../../../hooks/useFoodImport';
-import { CFDIPreview } from '../../../../components/food-import/CFDIPreview';
-import { MAGARequirementsCard } from '../../../../components/food-import/MAGARequirementsCard';
-import { DocumentChecklist } from '../../../../components/food-import/DocumentChecklist';
+import { useFoodImport, useUpdateFoodImportStatus } from '@/hooks/useFoodImport';
+import { CFDIPreview } from '@/components/food-import/CFDIPreview';
+import { MAGARequirementsCard } from '@/components/food-import/MAGARequirementsCard';
+import { DocumentChecklist } from '@/components/food-import/DocumentChecklist';
 import { useState } from 'react';
 
 const STATUS_FLOW: Record<string, { label: string; next?: string; nextLabel?: string; color: string }> = {

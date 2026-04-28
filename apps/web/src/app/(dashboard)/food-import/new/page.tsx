@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { useCreateFoodImport } from '../../../hooks/useFoodImport';
+import { useCreateFoodImport } from '@/hooks/useFoodImport';
 
 const STEPS = ['CFDI', 'Logística', 'Importador', 'Confirmar'];
 const INCOTERMS = ['FOB', 'CIF', 'CFR', 'EXW'];
