@@ -36,6 +36,16 @@ if (REDIS_ENABLED) {
 
 export { sigieQueue, satQueue };
 
+export function getConnection(): any {
+  if (!REDIS_ENABLED) throw new Error('Automation queue not available (Redis not configured)');
+  const IORedis = require('ioredis');
+  return new IORedis({
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+    maxRetriesPerRequest: null,
+  });
+}
+
 export async function enqueueSIGIE(type: SIGIEJobType, expedienteId: string, data?: object) {
   if (!sigieQueue) throw new Error('Automation queue not available (Redis not configured)');
   const jobId = `${type}-${expedienteId}`;
