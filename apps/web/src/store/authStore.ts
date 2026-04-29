@@ -13,6 +13,15 @@ interface AuthState {
   setUser: (user: User) => void;
 }
 
+function setCookie(name: string, value: string, days: number) {
+  const expires = new Date(Date.now() + days * 864e5).toUTCString();
+  document.cookie = `${name}=${value}; path=/; expires=${expires}; SameSite=Lax`;
+}
+
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; path=/; max-age=0`;
+}
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -23,11 +32,13 @@ export const useAuthStore = create<AuthState>()(
       login: (user, token, refreshToken) => {
         localStorage.setItem('zyn_token', token);
         localStorage.setItem('zyn_refresh_token', refreshToken);
+        setCookie('zyn_token', token, 7);
         set({ user, token, refreshToken, isAuthenticated: true });
       },
       logout: () => {
         localStorage.removeItem('zyn_token');
         localStorage.removeItem('zyn_refresh_token');
+        deleteCookie('zyn_token');
         set({ user: null, token: null, refreshToken: null, isAuthenticated: false });
       },
       setUser: (user) => set({ user }),
