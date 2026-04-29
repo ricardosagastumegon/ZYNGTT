@@ -1,47 +1,43 @@
-import { Queue, QueueOptions } from 'bullmq';
-import IORedis from 'ioredis';
 import { logger } from '../utils/logger';
 
-const redisOptions = {
-  host: process.env.REDIS_HOST ?? 'localhost',
-  port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
-  maxRetriesPerRequest: null,
-};
+const REDIS_ENABLED = !!(process.env.REDIS_HOST && process.env.REDIS_HOST !== 'localhost');
 
-let connection: IORedis | null = null;
-
-function getConnection(): IORedis {
-  if (!connection) {
-    connection = new IORedis(redisOptions);
-    connection.on('error', (err) => logger.warn('Redis connection error', err));
-  }
-  return connection;
-}
-
-const queueOptions: QueueOptions = {
-  connection: redisOptions,
-  defaultJobOptions: {
-    attempts: 3,
-    backoff: { type: 'exponential', delay: 5000 },
-    removeOnComplete: 100,
-    removeOnFail: 50,
-  },
-};
-
-export const sigieQueue = new Queue('sigie-jobs', queueOptions);
-export const satQueue = new Queue('sat-jobs', {
-  ...queueOptions,
-  defaultJobOptions: {
-    ...queueOptions.defaultJobOptions,
-    backoff: { type: 'exponential', delay: 10000 },
-  },
-});
-
-// Job types
 export type SIGIEJobType = 'CREATE_CONSTANCIA' | 'CHECK_STATUS' | 'DOWNLOAD_PERMIT';
 export type SATJobType = 'TRANSMIT_DUCA' | 'CHECK_SEMAFORO' | 'GENERATE_PAYMENT';
 
+let sigieQueue: any = null;
+let satQueue: any = null;
+
+if (REDIS_ENABLED) {
+  const { Queue } = require('bullmq');
+  const redisOptions = {
+    host: process.env.REDIS_HOST,
+    port: parseInt(process.env.REDIS_PORT ?? '6379', 10),
+    maxRetriesPerRequest: null,
+  };
+  const queueOptions = {
+    connection: redisOptions,
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 5000 },
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    },
+  };
+  sigieQueue = new Queue('sigie-jobs', queueOptions);
+  satQueue = new Queue('sat-jobs', {
+    ...queueOptions,
+    defaultJobOptions: { ...queueOptions.defaultJobOptions, backoff: { type: 'exponential', delay: 10000 } },
+  });
+  logger.info('BullMQ queues initialized');
+} else {
+  logger.warn('REDIS_HOST not configured — automation queues disabled');
+}
+
+export { sigieQueue, satQueue };
+
 export async function enqueueSIGIE(type: SIGIEJobType, expedienteId: string, data?: object) {
+  if (!sigieQueue) throw new Error('Automation queue not available (Redis not configured)');
   const jobId = `${type}-${expedienteId}`;
   const existing = await sigieQueue.getJob(jobId);
   if (existing && ['waiting', 'active', 'delayed'].includes(await existing.getState())) {
@@ -52,6 +48,7 @@ export async function enqueueSIGIE(type: SIGIEJobType, expedienteId: string, dat
 }
 
 export async function enqueueSAT(type: SATJobType, expedienteId: string, data?: object) {
+  if (!satQueue) throw new Error('Automation queue not available (Redis not configured)');
   const jobId = `${type}-${expedienteId}`;
   const existing = await satQueue.getJob(jobId);
   if (existing && ['waiting', 'active', 'delayed'].includes(await existing.getState())) {
@@ -60,5 +57,3 @@ export async function enqueueSAT(type: SATJobType, expedienteId: string, data?: 
   }
   return satQueue.add(type, { expedienteId, ...data }, { jobId });
 }
-
-export { getConnection };

@@ -21,37 +21,47 @@ export function startStatusPoller() {
 }
 
 async function pollSIGIE() {
-  const pending = await prisma.importExpediente.findMany({
-    where: {
-      sigieStatus: { in: ['SOLICITADO', 'EN_REVISION', 'RECIBIDA'] },
-      sigieNumSolicitud: { not: null },
-    },
-    select: { id: true },
-  });
+  try {
+    const pending = await prisma.importExpediente.findMany({
+      where: {
+        sigieStatus: { in: ['SOLICITADO', 'EN_REVISION', 'RECIBIDA'] },
+        sigieNumSolicitud: { not: null },
+      },
+      select: { id: true },
+    });
 
-  for (const { id } of pending) {
-    await enqueueSIGIE('CHECK_STATUS', id);
-  }
+    for (const { id } of pending) {
+      await enqueueSIGIE('CHECK_STATUS', id);
+    }
 
-  if (pending.length > 0) {
-    logger.info(`SIGIE poller: enqueued ${pending.length} status checks`);
+    if (pending.length > 0) {
+      logger.info(`SIGIE poller: enqueued ${pending.length} status checks`);
+    }
+  } catch (err: any) {
+    if (err.message?.includes('Redis not configured')) return;
+    throw err;
   }
 }
 
 async function pollSAT() {
-  const pending = await prisma.importExpediente.findMany({
-    where: {
-      status: 'DUCA_TRANSMITIDA',
-      ducaDNumero: { not: null },
-    },
-    select: { id: true },
-  });
+  try {
+    const pending = await prisma.importExpediente.findMany({
+      where: {
+        status: 'DUCA_TRANSMITIDA',
+        ducaDNumero: { not: null },
+      },
+      select: { id: true },
+    });
 
-  for (const { id } of pending) {
-    await enqueueSAT('CHECK_SEMAFORO', id);
-  }
+    for (const { id } of pending) {
+      await enqueueSAT('CHECK_SEMAFORO', id);
+    }
 
-  if (pending.length > 0) {
-    logger.info(`SAT poller: enqueued ${pending.length} semáforo checks`);
+    if (pending.length > 0) {
+      logger.info(`SAT poller: enqueued ${pending.length} semáforo checks`);
+    }
+  } catch (err: any) {
+    if (err.message?.includes('Redis not configured')) return;
+    throw err;
   }
 }
