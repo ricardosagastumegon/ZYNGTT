@@ -16,8 +16,6 @@ async function main() {
     create: { name: 'Agroindustria Ajua SA', taxId: '119397315', country: 'GT' },
   });
 
-  // NOTE: AgentProfile / TransporterProfile models don't exist in schema yet.
-  // Storing agency and transporter as Company records so data is not lost.
   const existingAgencia = await prisma.company.findFirst({ where: { name: 'Agencia Aduanal GT' } });
   const companyAgencia = await prisma.company.upsert({
     where: { id: existingAgencia?.id ?? 'none' },
@@ -25,11 +23,45 @@ async function main() {
     create: { name: 'Agencia Aduanal GT', taxId: '12345678', country: 'GT' },
   });
 
-  const existingTransporte = await prisma.company.findFirst({ where: { name: 'Transportes Peralta' } });
-  const companyTransporte = await prisma.company.upsert({
-    where: { id: existingTransporte?.id ?? 'none' },
+  // ── Transport Catalogs ───────────────────────────────────────────────────────
+
+  const transportEmpresa = await prisma.transportEmpresa.upsert({
+    where: { CAAT: 'TEST-CAAT-001' },
     update: {},
-    create: { name: 'Transportes Peralta', country: 'GT' },
+    create: { nombre: 'TRANSPORTES PERALTA', CAAT: 'TEST-CAAT-001' },
+  });
+
+  const piloto = await prisma.piloto.upsert({
+    where: { id: 'seed-piloto-001' },
+    update: {},
+    create: {
+      id: 'seed-piloto-001',
+      empresaId: transportEmpresa.id,
+      nombre: 'GUSTAVO ADOLFO GONZALEZ LIMATUJ',
+      numLicencia: 'LIC-001',
+      tipoLicencia: 'C',
+    },
+  });
+
+  const cabezal = await prisma.cabezal.upsert({
+    where: { placa: 'C-995CBP' },
+    update: {},
+    create: {
+      empresaId: transportEmpresa.id,
+      placa: 'C-995CBP',
+      marca: 'Kenworth',
+    },
+  });
+
+  const caja = await prisma.caja.upsert({
+    where: { placa: 'TC-44BVY' },
+    update: {},
+    create: {
+      empresaId: transportEmpresa.id,
+      placa: 'TC-44BVY',
+      numEconomico: '001',
+      tipo: 'SECA',
+    },
   });
 
   // ── Users ────────────────────────────────────────────────────────────────────
@@ -74,18 +106,17 @@ async function main() {
 
   await prisma.user.upsert({
     where: { email: 'transporte@axon.gt' },
-    update: { password: await hash('transporte'), firstName: 'Transportes', lastName: 'Peralta', companyId: companyTransporte.id },
+    update: { password: await hash('transporte'), firstName: 'Transportes', lastName: 'Peralta' },
     create: {
       email: 'transporte@axon.gt',
       password: await hash('transporte'),
       firstName: 'Transportes',
       lastName: 'Peralta',
       role: 'TRANSPORTISTA',
-      companyId: companyTransporte.id,
     },
   });
 
-  // ── Demo shipments (empresa@axon.gt) ─────────────────────────────────────────
+  // ── Demo shipments ────────────────────────────────────────────────────────────
 
   const s1 = await prisma.shipment.upsert({
     where: { reference: 'ZYN-2024-001' },
@@ -147,8 +178,10 @@ async function main() {
       incoterm: 'FOB', moneda: 'USD', totalUSD: 22000, pesoTotalKG: 8000,
       mercancias: [{ fraccion: '0702000000', nombre: 'TOMATE', cantidadKG: 8000, valorUSD: 22000 }],
       status: 'SIGIE_APROBADO', sigieStatus: 'APROBADO',
-      pilotoNombre: 'Pedro Ramirez', pilotoLicencia: 'L-12345',
-      cabezalPlaca: 'P-123ABC', furgonPlaca: 'R-456DEF',
+      transporteEmpresaId: transportEmpresa.id,
+      pilotoId: piloto.id,
+      cabezalId: cabezal.id,
+      cajaId: caja.id,
     },
   });
 
@@ -172,6 +205,11 @@ async function main() {
   console.log('  🏢 Empresa:        empresa@axon.gt       /  empresa');
   console.log('  🛃 Agente:         agente@axon.gt        /  agente');
   console.log('  🚛 Transportista:  transporte@axon.gt    /  transporte');
+  console.log('─────────────────────────────────────────────────────────────');
+  console.log('  🚛 TransportEmpresa: TRANSPORTES PERALTA / TEST-CAAT-001');
+  console.log('  👤 Piloto: GUSTAVO ADOLFO GONZALEZ LIMATUJ / LIC-001');
+  console.log('  🚜 Cabezal: C-995CBP (Kenworth)');
+  console.log('  📦 Caja: TC-44BVY / 001 / SECA');
   console.log('─────────────────────────────────────────────────────────────\n');
 }
 

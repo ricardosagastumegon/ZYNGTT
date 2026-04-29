@@ -8,15 +8,16 @@ import { logger } from '../utils/logger';
 
 
 interface TransportData {
-  transporteEmpresa?: string;
-  transporteCAAT?: string;
-  pilotoNombre?: string;
-  pilotoLicencia?: string;
-  cabezalPlaca?: string;
-  cabezalTarjeta?: string;
-  furgonPlaca?: string;
-  furgonTarjeta?: string;
-  numEconomico?: string;
+  transporteEmpresaId?: string;
+  pilotoId?: string;
+  cabezalId?: string;
+  cajaId?: string;
+  origenDireccion?: string;
+  origenCiudad?: string;
+  origenPais?: string;
+  destinoDireccion?: string;
+  destinoCiudad?: string;
+  destinoPais?: string;
   fleteCosto?: number;
   aduanaSalidaMX?: string;
   aduanaEntradaGT?: string;
@@ -125,10 +126,16 @@ export const importExpedienteService = {
   async generateDocuments(id: string, userId: string) {
     const exp = await prisma.importExpediente.findFirst({
       where: { id, userId },
-      include: { shipment: true },
+      include: {
+        shipment: true,
+        piloto: true,
+        cabezal: true,
+        caja: true,
+        transporteEmpresa: true,
+      },
     });
     if (!exp) throw new AppError('Expediente no encontrado', 404);
-    if (!exp.pilotoNombre) throw new AppError('Datos de transporte incompletos — llena el Paso 2 primero', 400);
+    if (!exp.pilotoId) throw new AppError('Datos de transporte incompletos — llena el Paso 2 primero', 400);
 
     const folder = `axon/expedientes/${id}`;
     const mercancias = exp.mercancias as { fraccion: string; cantidadKG: number; valorUSD?: number; nombre?: string; cantidadBultos?: number; tipoBulto?: string }[];
@@ -139,18 +146,18 @@ export const importExpedienteService = {
       ...exp,
       mercancias,
       pesoTotalKG: exp.pesoTotalKG,
-      // Prisma returns string|null; PDF types expect string|undefined
       impNIT: exp.impNIT ?? undefined,
       impDireccion: exp.impDireccion ?? undefined,
-      pilotoNombre: exp.pilotoNombre ?? undefined,
-      pilotoLicencia: exp.pilotoLicencia ?? undefined,
-      cabezalPlaca: exp.cabezalPlaca ?? undefined,
-      furgonPlaca: exp.furgonPlaca ?? undefined,
-      numEconomico: exp.numEconomico ?? undefined,
+      // Map catalog relations to string fields expected by PDF generator
+      pilotoNombre: exp.piloto?.nombre ?? undefined,
+      pilotoLicencia: exp.piloto?.numLicencia ?? undefined,
+      cabezalPlaca: exp.cabezal?.placa ?? undefined,
+      furgonPlaca: exp.caja?.placa ?? undefined,
+      numEconomico: exp.caja?.numEconomico ?? undefined,
+      transporteEmpresa: exp.transporteEmpresa?.nombre ?? undefined,
+      transporteCAAT: exp.transporteEmpresa?.CAAT ?? undefined,
       aduanaSalidaMX: exp.aduanaSalidaMX ?? undefined,
       aduanaEntradaGT: exp.aduanaEntradaGT ?? undefined,
-      transporteEmpresa: exp.transporteEmpresa ?? undefined,
-      transporteCAAT: exp.transporteCAAT ?? undefined,
       cartaPorteNum: exp.cartaPorteNum ?? undefined,
       manifiestoNum: exp.manifiestoNum ?? undefined,
       packingListNum: exp.packingListNum ?? undefined,

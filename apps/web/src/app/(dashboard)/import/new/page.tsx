@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Upload, Truck, FileText, CheckCircle2, ChevronRight, ChevronLeft, AlertCircle } from 'lucide-react';
 
@@ -19,20 +20,26 @@ interface CFDIPreview {
 }
 
 interface TransportForm {
-  transporteEmpresa: string;
-  transporteCAAT: string;
-  pilotoNombre: string;
-  pilotoLicencia: string;
-  cabezalPlaca: string;
-  cabezalTarjeta: string;
-  furgonPlaca: string;
-  furgonTarjeta: string;
-  numEconomico: string;
+  transporteEmpresaId: string;
+  pilotoId: string;
+  cabezalId: string;
+  cajaId: string;
+  origenDireccion: string;
+  origenCiudad: string;
+  origenPais: string;
+  destinoDireccion: string;
+  destinoCiudad: string;
+  destinoPais: string;
   fleteCosto: string;
   aduanaSalidaMX: string;
   aduanaEntradaGT: string;
   fechaCruce: string;
 }
+
+interface TransportEmpresa { id: string; nombre: string; CAAT: string }
+interface Piloto { id: string; nombre: string; numLicencia: string }
+interface Cabezal { id: string; placa: string; marca?: string }
+interface Caja { id: string; placa: string; numEconomico?: string; tipo: string }
 
 const STEPS = [
   { n: 1, label: 'CFDI', icon: Upload },
@@ -41,28 +48,80 @@ const STEPS = [
   { n: 4, label: 'Confirmar', icon: CheckCircle2 },
 ];
 
+const ADUANAS_MX = ['ADUANA SUCHIATE II', 'ADUANA SUCHIATE I', 'ADUANA CIUDAD HIDALGO'];
+const ADUANAS_GT = ['ADUANA TECUN UMAN II', 'ADUANA TECUN UMAN I', 'ADUANA EL CARMEN'];
+
+function FieldLabel({ children }: { children: React.ReactNode }) {
+  return <label className="block text-xs font-medium mb-1 text-gray-500">{children}</label>;
+}
+
+function SelectField({ value, onChange, disabled, children }: {
+  value: string; onChange: (v: string) => void; disabled?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled}
+      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:bg-gray-50 disabled:text-gray-400">
+      {children}
+    </select>
+  );
+}
+
+function TextField({ value, onChange, type = 'text', placeholder }: {
+  value: string; onChange: (v: string) => void; type?: string; placeholder?: string;
+}) {
+  return (
+    <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+  );
+}
+
 export default function NewImportPage() {
   const router = useRouter();
   const [step, setStep] = useState<WizardStep>(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Step 1
   const [cfdiFile, setCfdiFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CFDIPreview | null>(null);
 
-  // Step 2
   const [transport, setTransport] = useState<TransportForm>({
-    transporteEmpresa: '', transporteCAAT: '', pilotoNombre: '', pilotoLicencia: '',
-    cabezalPlaca: '', cabezalTarjeta: '', furgonPlaca: '', furgonTarjeta: '',
-    numEconomico: '', fleteCosto: '350', aduanaSalidaMX: 'ADUANA SUCHIATE II',
-    aduanaEntradaGT: 'ADUANA TECUN UMAN II', fechaCruce: '',
+    transporteEmpresaId: '', pilotoId: '', cabezalId: '', cajaId: '',
+    origenDireccion: '', origenCiudad: '', origenPais: 'MX',
+    destinoDireccion: '', destinoCiudad: 'Ciudad de Guatemala', destinoPais: 'GT',
+    fleteCosto: '350',
+    aduanaSalidaMX: 'ADUANA SUCHIATE II',
+    aduanaEntradaGT: 'ADUANA TECUN UMAN II',
+    fechaCruce: '',
   });
 
-  // Step 3
-  const [fitoFile, setFitoFile] = useState<File | null>(null);
-  const [labFile, setLabFile] = useState<File | null>(null);
-  const [docsGenerated, setDocsGenerated] = useState(false);
+  const setT = (key: keyof TransportForm) => (v: string) =>
+    setTransport(p => ({ ...p, [key]: v }));
+
+  const { data: empresas = [] } = useQuery<TransportEmpresa[]>({
+    queryKey: ['transport-empresas'],
+    queryFn: () => api.get('/api/transport/empresas').then(r => r.data.data),
+    enabled: step === 2,
+  });
+
+  const selectedEmpresa = empresas.find(e => e.id === transport.transporteEmpresaId);
+
+  const { data: pilotos = [] } = useQuery<Piloto[]>({
+    queryKey: ['t-pilotos', transport.transporteEmpresaId],
+    queryFn: () => api.get(`/api/transport/empresas/${transport.transporteEmpresaId}/pilotos`).then(r => r.data.data),
+    enabled: !!transport.transporteEmpresaId,
+  });
+
+  const { data: cabezales = [] } = useQuery<Cabezal[]>({
+    queryKey: ['t-cabezales', transport.transporteEmpresaId],
+    queryFn: () => api.get(`/api/transport/empresas/${transport.transporteEmpresaId}/cabezales`).then(r => r.data.data),
+    enabled: !!transport.transporteEmpresaId,
+  });
+
+  const { data: cajas = [] } = useQuery<Caja[]>({
+    queryKey: ['t-cajas', transport.transporteEmpresaId],
+    queryFn: () => api.get(`/api/transport/empresas/${transport.transporteEmpresaId}/cajas`).then(r => r.data.data),
+    enabled: !!transport.transporteEmpresaId,
+  });
 
   async function handleCFDIUpload() {
     if (!cfdiFile) { setError('Selecciona el archivo CFDI XML'); return; }
@@ -88,7 +147,20 @@ export default function NewImportPage() {
     setLoading(true); setError('');
     try {
       await api.post(`/api/import/transport/${preview.expedienteId}`, {
-        ...transport, fleteCosto: parseFloat(transport.fleteCosto) || 350,
+        transporteEmpresaId: transport.transporteEmpresaId || undefined,
+        pilotoId: transport.pilotoId || undefined,
+        cabezalId: transport.cabezalId || undefined,
+        cajaId: transport.cajaId || undefined,
+        origenDireccion: transport.origenDireccion || undefined,
+        origenCiudad: transport.origenCiudad || undefined,
+        origenPais: transport.origenPais || undefined,
+        destinoDireccion: transport.destinoDireccion || undefined,
+        destinoCiudad: transport.destinoCiudad || undefined,
+        destinoPais: transport.destinoPais || undefined,
+        fleteCosto: parseFloat(transport.fleteCosto) || 350,
+        aduanaSalidaMX: transport.aduanaSalidaMX || undefined,
+        aduanaEntradaGT: transport.aduanaEntradaGT || undefined,
+        fechaCruce: transport.fechaCruce || undefined,
       });
       setStep(3);
     } catch (e: unknown) {
@@ -122,16 +194,18 @@ export default function NewImportPage() {
     if (preview) router.push(`/import/${preview.expedienteId}`);
   }
 
+  const [fitoFile, setFitoFile] = useState<File | null>(null);
+  const [labFile, setLabFile] = useState<File | null>(null);
+  const [docsGenerated, setDocsGenerated] = useState(false);
   const needsLab = preview?.mercancias?.some((m) => m.labRequerido);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold" style={{ fontFamily: 'var(--font-display)' }}>
           Nueva Importación MX → GT
         </h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+        <p className="text-sm mt-1 text-gray-500">
           Completa los 4 pasos para gestionar tu expediente de importación
         </p>
       </div>
@@ -146,38 +220,29 @@ export default function NewImportPage() {
               <Icon size={15} />
               <span>{label}</span>
             </div>
-            {i < STEPS.length - 1 && (
-              <ChevronRight size={16} className="text-gray-300 mx-1" />
-            )}
+            {i < STEPS.length - 1 && <ChevronRight size={16} className="text-gray-300 mx-1" />}
           </div>
         ))}
       </div>
 
-      {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 p-3 rounded-lg text-sm" style={{ background: '#FEE2E2', color: 'var(--danger)' }}>
-          <AlertCircle size={16} />
-          {error}
+        <div className="flex items-center gap-2 p-3 rounded-lg text-sm bg-red-50 text-red-600">
+          <AlertCircle size={16} /> {error}
         </div>
       )}
 
       {/* STEP 1 — CFDI */}
       {step === 1 && (
-        <div className="rounded-xl border bg-white p-6 space-y-4" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="rounded-xl border border-gray-100 bg-white p-6 space-y-4">
           <h2 className="font-semibold text-lg">Paso 1: Cargar CFDI de Exportación</h2>
-
           <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-              Archivo CFDI 4.0 (XML)
-            </label>
-            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 transition"
-              style={{ borderColor: 'var(--color-border)' }}>
+            <label className="block text-sm font-medium mb-1 text-gray-500">Archivo CFDI 4.0 (XML)</label>
+            <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50 transition">
               <Upload size={24} className="mb-2 text-gray-400" />
               <span className="text-sm text-gray-500">{cfdiFile ? cfdiFile.name : 'Click o arrastra el archivo XML'}</span>
               <input type="file" accept=".xml" className="hidden" onChange={e => setCfdiFile(e.target.files?.[0] ?? null)} />
             </label>
           </div>
-
           <button onClick={handleCFDIUpload} disabled={loading || !cfdiFile}
             className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50 transition"
             style={{ background: 'var(--brand-primary)' }}>
@@ -188,83 +253,126 @@ export default function NewImportPage() {
 
       {/* STEP 2 — Transporte */}
       {step === 2 && preview && (
-        <div className="rounded-xl border bg-white p-6 space-y-4" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="rounded-xl border border-gray-100 bg-white p-6 space-y-5">
           <h2 className="font-semibold text-lg">Paso 2: Datos de Transporte</h2>
 
           {/* CFDI summary */}
-          <div className="rounded-lg p-3 text-sm space-y-1" style={{ background: 'var(--neutral-50)', borderColor: 'var(--color-border)', border: '1px solid' }}>
+          <div className="rounded-lg p-3 text-sm space-y-1 bg-gray-50 border border-gray-100">
             <p><span className="font-medium">Exportador:</span> {preview.expNombre} ({preview.expRFC})</p>
             <p><span className="font-medium">Importador:</span> {preview.impNombre}</p>
-            <div className="flex gap-4 flex-wrap mt-2">
+            <div className="flex gap-2 flex-wrap mt-2">
               {preview.mercancias?.map((m, i) => (
-                <span key={i} className="text-xs px-2 py-0.5 rounded-full font-medium"
-                  style={{ background: m.labRequerido ? '#FEF9C3' : 'var(--neutral-100)', color: m.labRequerido ? 'var(--warning)' : 'var(--color-text-secondary)' }}>
+                <span key={i} className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.labRequerido ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>
                   {m.nombre || m.fraccion} · {m.cantidadKG}kg {m.labRequerido ? '⚠️ Lab' : ''}
                 </span>
               ))}
             </div>
-            <p className="font-medium mt-2" style={{ fontFamily: 'var(--font-mono)' }}>
+            <p className="font-medium mt-2 font-mono text-xs">
               Total: ${preview.totalUSD?.toLocaleString()} USD · DAI: Q{preview.tributos?.daiGTQ?.toFixed(2)} · IVA: Q{preview.tributos?.ivaGTQ?.toFixed(2)}
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            {([
-              ['transporteEmpresa', 'Empresa Transportista'],
-              ['transporteCAAT', 'No. CAAT'],
-              ['pilotoNombre', 'Nombre del Piloto'],
-              ['pilotoLicencia', 'Licencia del Piloto'],
-              ['cabezalPlaca', 'Placa Cabezal'],
-              ['cabezalTarjeta', 'Tarjeta de Circulación Cabezal'],
-              ['furgonPlaca', 'Placa Furgón'],
-              ['furgonTarjeta', 'Tarjeta de Circulación Furgón'],
-              ['numEconomico', 'No. Económico'],
-              ['fleteCosto', 'Costo del Flete (USD)'],
-            ] as [keyof TransportForm, string][]).map(([key, label]) => (
-              <div key={key}>
-                <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>{label}</label>
-                <input type={key === 'fleteCosto' ? 'number' : 'text'}
-                  value={transport[key]}
-                  onChange={e => setTransport(p => ({ ...p, [key]: e.target.value }))}
-                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
-                  style={{ borderColor: 'var(--color-border)' }} />
+          {/* Empresa de transporte */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Empresa de Transporte</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <FieldLabel>Empresa Transportista</FieldLabel>
+                <SelectField value={transport.transporteEmpresaId} onChange={v => {
+                  setTransport(p => ({ ...p, transporteEmpresaId: v, pilotoId: '', cabezalId: '', cajaId: '' }));
+                }}>
+                  <option value="">Seleccionar empresa...</option>
+                  {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                </SelectField>
               </div>
-            ))}
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Aduana Salida MX</label>
-              <select value={transport.aduanaSalidaMX}
-                onChange={e => setTransport(p => ({ ...p, aduanaSalidaMX: e.target.value }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
-                style={{ borderColor: 'var(--color-border)' }}>
-                <option>ADUANA SUCHIATE II</option>
-                <option>ADUANA SUCHIATE I</option>
-                <option>ADUANA CIUDAD HIDALGO</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Aduana Entrada GT</label>
-              <select value={transport.aduanaEntradaGT}
-                onChange={e => setTransport(p => ({ ...p, aduanaEntradaGT: e.target.value }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
-                style={{ borderColor: 'var(--color-border)' }}>
-                <option>ADUANA TECUN UMAN II</option>
-                <option>ADUANA TECUN UMAN I</option>
-                <option>ADUANA EL CARMEN</option>
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>Fecha Estimada de Cruce</label>
-              <input type="date" value={transport.fechaCruce}
-                onChange={e => setTransport(p => ({ ...p, fechaCruce: e.target.value }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none"
-                style={{ borderColor: 'var(--color-border)' }} />
+              {selectedEmpresa && (
+                <div className="col-span-2">
+                  <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-lg text-sm">
+                    <span className="text-indigo-500 font-medium">CAAT:</span>
+                    <span className="font-mono text-indigo-700">{selectedEmpresa.CAAT}</span>
+                  </div>
+                </div>
+              )}
+              <div>
+                <FieldLabel>Piloto</FieldLabel>
+                <SelectField value={transport.pilotoId} onChange={setT('pilotoId')} disabled={!transport.transporteEmpresaId}>
+                  <option value="">Seleccionar piloto...</option>
+                  {pilotos.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.numLicencia}</option>)}
+                </SelectField>
+              </div>
+              <div>
+                <FieldLabel>Cabezal</FieldLabel>
+                <SelectField value={transport.cabezalId} onChange={setT('cabezalId')} disabled={!transport.transporteEmpresaId}>
+                  <option value="">Seleccionar cabezal...</option>
+                  {cabezales.map(c => <option key={c.id} value={c.id}>{c.placa}{c.marca ? ` — ${c.marca}` : ''}</option>)}
+                </SelectField>
+              </div>
+              <div>
+                <FieldLabel>Caja / Furgón</FieldLabel>
+                <SelectField value={transport.cajaId} onChange={setT('cajaId')} disabled={!transport.transporteEmpresaId}>
+                  <option value="">Seleccionar caja...</option>
+                  {cajas.map(c => <option key={c.id} value={c.id}>{c.placa}{c.numEconomico ? ` — #${c.numEconomico}` : ''} ({c.tipo})</option>)}
+                </SelectField>
+              </div>
             </div>
           </div>
 
-          <div className="flex gap-3">
+          {/* Origen / Destino */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Origen y Destino</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-3 font-medium text-xs text-gray-400 uppercase">Origen (México)</div>
+              <div className="col-span-2">
+                <FieldLabel>Dirección de origen</FieldLabel>
+                <TextField value={transport.origenDireccion} onChange={setT('origenDireccion')} placeholder="Calle, Colonia, No." />
+              </div>
+              <div>
+                <FieldLabel>Ciudad</FieldLabel>
+                <TextField value={transport.origenCiudad} onChange={setT('origenCiudad')} placeholder="Ej. Tapachula" />
+              </div>
+
+              <div className="col-span-3 font-medium text-xs text-gray-400 uppercase mt-2">Destino (Guatemala)</div>
+              <div className="col-span-2">
+                <FieldLabel>Dirección de destino</FieldLabel>
+                <TextField value={transport.destinoDireccion} onChange={setT('destinoDireccion')} placeholder="Bodega, zona, municipio" />
+              </div>
+              <div>
+                <FieldLabel>Ciudad</FieldLabel>
+                <TextField value={transport.destinoCiudad} onChange={setT('destinoCiudad')} placeholder="Ej. Guatemala" />
+              </div>
+            </div>
+          </div>
+
+          {/* Aduana / Cruce */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Cruce Fronterizo</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <FieldLabel>Aduana Salida MX</FieldLabel>
+                <SelectField value={transport.aduanaSalidaMX} onChange={setT('aduanaSalidaMX')}>
+                  {ADUANAS_MX.map(a => <option key={a}>{a}</option>)}
+                </SelectField>
+              </div>
+              <div>
+                <FieldLabel>Aduana Entrada GT</FieldLabel>
+                <SelectField value={transport.aduanaEntradaGT} onChange={setT('aduanaEntradaGT')}>
+                  {ADUANAS_GT.map(a => <option key={a}>{a}</option>)}
+                </SelectField>
+              </div>
+              <div>
+                <FieldLabel>Fecha estimada de cruce</FieldLabel>
+                <TextField value={transport.fechaCruce} onChange={setT('fechaCruce')} type="date" />
+              </div>
+              <div>
+                <FieldLabel>Costo del flete (USD)</FieldLabel>
+                <TextField value={transport.fleteCosto} onChange={setT('fleteCosto')} type="number" placeholder="350" />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3 pt-2">
             <button onClick={() => setStep(1)}
-              className="flex items-center gap-1 px-4 py-2 border rounded-lg text-sm transition hover:bg-gray-50"
-              style={{ borderColor: 'var(--color-border)' }}>
+              className="flex items-center gap-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition">
               <ChevronLeft size={15} /> Atrás
             </button>
             <button onClick={handleTransportSave} disabled={loading}
@@ -278,50 +386,37 @@ export default function NewImportPage() {
 
       {/* STEP 3 — Documentos */}
       {step === 3 && preview && (
-        <div className="rounded-xl border bg-white p-6 space-y-4" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="rounded-xl border border-gray-100 bg-white p-6 space-y-4">
           <h2 className="font-semibold text-lg">Paso 3: Documentos</h2>
-
-          <div className="p-3 rounded-lg text-sm" style={{ background: 'var(--neutral-50)' }}>
+          <div className="p-3 rounded-lg text-sm bg-gray-50">
             <p className="font-medium mb-1">Documentos a generar automáticamente:</p>
-            <ul className="space-y-1" style={{ color: 'var(--color-text-secondary)' }}>
+            <ul className="space-y-1 text-gray-500">
               <li>✅ Carta Porte Terrestre (México)</li>
               <li>✅ Carta Porte Terrestre (Guatemala)</li>
               <li>✅ Packing List</li>
             </ul>
           </div>
-
-          {/* Fitosanitario MX */}
           <div>
             <label className="block text-sm font-medium mb-1">Certificado Fitosanitario MX (PDF)</label>
-            <label className="flex items-center gap-2 px-4 py-2.5 border rounded-lg cursor-pointer hover:bg-gray-50 transition text-sm"
-              style={{ borderColor: 'var(--color-border)' }}>
+            <label className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50 transition text-sm">
               <Upload size={15} className="text-gray-400" />
               {fitoFile ? fitoFile.name : 'Seleccionar archivo fito MX'}
-              <input type="file" accept=".pdf,.jpg,.png" className="hidden"
-                onChange={e => setFitoFile(e.target.files?.[0] ?? null)} />
+              <input type="file" accept=".pdf,.jpg,.png" className="hidden" onChange={e => setFitoFile(e.target.files?.[0] ?? null)} />
             </label>
           </div>
-
-          {/* Lab — condicional */}
           {needsLab && (
-            <div className="p-3 rounded-lg border" style={{ borderColor: '#FDE68A', background: '#FFFBEB' }}>
-              <p className="text-sm font-medium mb-2" style={{ color: 'var(--warning)' }}>
-                ⚠️ Este producto requiere análisis de laboratorio
-              </p>
-              <label className="flex items-center gap-2 px-4 py-2.5 border rounded-lg cursor-pointer hover:bg-yellow-50 transition text-sm"
-                style={{ borderColor: '#FDE68A' }}>
+            <div className="p-3 rounded-lg border border-yellow-200 bg-yellow-50">
+              <p className="text-sm font-medium mb-2 text-yellow-700">⚠️ Este producto requiere análisis de laboratorio</p>
+              <label className="flex items-center gap-2 px-4 py-2.5 border border-yellow-200 rounded-lg cursor-pointer hover:bg-yellow-50 transition text-sm">
                 <Upload size={15} />
                 {labFile ? labFile.name : 'Subir resultado de laboratorio'}
-                <input type="file" accept=".pdf,.jpg,.png" className="hidden"
-                  onChange={e => setLabFile(e.target.files?.[0] ?? null)} />
+                <input type="file" accept=".pdf,.jpg,.png" className="hidden" onChange={e => setLabFile(e.target.files?.[0] ?? null)} />
               </label>
             </div>
           )}
-
           <div className="flex gap-3">
             <button onClick={() => setStep(2)}
-              className="flex items-center gap-1 px-4 py-2 border rounded-lg text-sm hover:bg-gray-50 transition"
-              style={{ borderColor: 'var(--color-border)' }}>
+              className="flex items-center gap-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 transition">
               <ChevronLeft size={15} /> Atrás
             </button>
             <button onClick={handleGenerateDocs} disabled={loading}
@@ -335,36 +430,32 @@ export default function NewImportPage() {
 
       {/* STEP 4 — Confirmar */}
       {step === 4 && preview && (
-        <div className="rounded-xl border bg-white p-6 space-y-4" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="rounded-xl border border-gray-100 bg-white p-6 space-y-4">
           <div className="text-center py-6">
-            <CheckCircle2 className="w-14 h-14 mx-auto mb-3" style={{ color: 'var(--success)' }} />
+            <CheckCircle2 className="w-14 h-14 mx-auto mb-3 text-green-500" />
             <h2 className="text-xl font-semibold">¡Expediente creado exitosamente!</h2>
-            <p className="text-sm mt-2" style={{ color: 'var(--color-text-secondary)' }}>
+            <p className="text-sm mt-2 text-gray-500">
               Los documentos han sido generados. El siguiente paso es solicitar el permiso MAGA vía SIGIE.
             </p>
           </div>
-
-          <div className="rounded-lg p-4 space-y-2 text-sm" style={{ background: 'var(--neutral-50)' }}>
+          <div className="rounded-lg p-4 space-y-2 text-sm bg-gray-50">
             <div className="flex justify-between">
-              <span style={{ color: 'var(--color-text-secondary)' }}>Exportador</span>
+              <span className="text-gray-500">Exportador</span>
               <span className="font-medium">{preview.expNombre}</span>
             </div>
             <div className="flex justify-between">
-              <span style={{ color: 'var(--color-text-secondary)' }}>Importador</span>
+              <span className="text-gray-500">Importador</span>
               <span className="font-medium">{preview.impNombre}</span>
             </div>
             <div className="flex justify-between">
-              <span style={{ color: 'var(--color-text-secondary)' }}>Total USD</span>
-              <span className="font-bold" style={{ fontFamily: 'var(--font-mono)' }}>${preview.totalUSD?.toLocaleString()}</span>
+              <span className="text-gray-500">Total USD</span>
+              <span className="font-bold font-mono">${preview.totalUSD?.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
-              <span style={{ color: 'var(--color-text-secondary)' }}>Tributos estimados</span>
-              <span className="font-bold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--warning)' }}>
-                Q{preview.tributos?.totalTributosGTQ?.toFixed(2)}
-              </span>
+              <span className="text-gray-500">Tributos estimados</span>
+              <span className="font-bold font-mono text-yellow-600">Q{preview.tributos?.totalTributosGTQ?.toFixed(2)}</span>
             </div>
           </div>
-
           <button onClick={handleFinish}
             className="w-full py-2.5 rounded-lg text-white text-sm font-medium transition"
             style={{ background: 'var(--brand-primary)' }}>

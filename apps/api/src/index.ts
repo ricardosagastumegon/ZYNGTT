@@ -19,6 +19,7 @@ import foodImportRoutes from './routes/food-import.routes';
 import importExpedienteRoutes from './routes/import-expediente.routes';
 import automationRoutes from './routes/automation.routes';
 import { adminRoutes } from './routes/admin.routes';
+import { transportCatalogRoutes } from './routes/transport-catalog.routes';
 import { startStatusPoller } from './jobs/status-poller';
 
 const app = express();
@@ -62,6 +63,7 @@ app.use('/api/food-imports', foodImportRoutes);
 app.use('/api/import', importExpedienteRoutes);
 app.use('/api/automation', automationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/transport', transportCatalogRoutes);
 
 app.use(errorHandler);
 
