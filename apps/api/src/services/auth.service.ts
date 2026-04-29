@@ -33,6 +33,11 @@ export const authService = {
     const user = await userModel.findByEmail(email);
     if (!user) throw new AppError('Invalid credentials', 401);
 
+    if (!user.isActive) {
+      await activityLogService.log(user.id, 'LOGIN_FAILED', 'Login rechazado — cuenta desactivada');
+      throw new AppError('Cuenta desactivada. Contacta al administrador.', 403);
+    }
+
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) {
       await activityLogService.log(user.id, 'LOGIN_FAILED', 'Intento de login fallido');

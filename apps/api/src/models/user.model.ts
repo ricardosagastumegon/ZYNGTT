@@ -1,6 +1,5 @@
-import { PrismaClient, User, Company } from '@prisma/client';
-
-const prisma = new PrismaClient();
+﻿import { User, Company } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
 export const userModel = {
   findByEmail: (email: string) =>

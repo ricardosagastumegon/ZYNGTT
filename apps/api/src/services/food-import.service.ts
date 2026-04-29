@@ -1,4 +1,5 @@
-import { PrismaClient, FoodImportStatus } from '@prisma/client';
+﻿import { FoodImportStatus } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { parseCFDI } from './cfdi-parser.service';
 import {
   getMAGARequirements,
@@ -16,7 +17,6 @@ import {
   SIGIEResult,
 } from '../automation/sigie-maga.automation';
 
-const prisma = new PrismaClient();
 
 export interface CreateFoodImportInput {
   shipmentId: string;
@@ -331,3 +331,4 @@ export const foodImportService = {
     }
   },
 };
+

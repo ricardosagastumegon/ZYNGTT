@@ -1,10 +1,9 @@
-import { Worker } from 'bullmq';
-import { PrismaClient } from '@prisma/client';
+﻿import { Worker } from 'bullmq';
+import { prisma } from '../lib/prisma';
 import { getCredentials } from '../utils/credentials-vault';
 import { login, transmitirDUCAD, consultarSemaforo, generarPago } from '../automation/sat-aduanas.bot';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
 
 const redisOptions = {
   host: process.env.REDIS_HOST ?? 'localhost',

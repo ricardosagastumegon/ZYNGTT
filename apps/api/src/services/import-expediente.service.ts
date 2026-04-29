@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+﻿import { prisma } from '../lib/prisma';
 import { AppError } from '../utils/AppError';
 import { parseCFDI } from './cfdi-parser.service';
 import { calcularTributos, getHSInfo, Mercancia } from '../data/hs-map';
@@ -6,7 +6,6 @@ import { generateCartaPorteMX, generateCartaPorteGT, generatePackingList } from 
 import { uploadBuffer } from '../integrations/cloudinary';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
 
 interface TransportData {
   transporteEmpresa?: string;
@@ -216,16 +215,22 @@ export const importExpedienteService = {
     return exp;
   },
 
-  async list(userId: string, role: string) {
-    // Agents and admins see all; others see only their own
+  async list(userId: string, role: string, page = 1, limit = 20) {
     const where = ['AGENTE', 'ADMIN', 'SUPERADMIN'].includes(role) ? {} : { userId };
-    return prisma.importExpediente.findMany({
-      where,
-      include: {
-        shipment: { select: { reference: true, status: true } },
-        user: { select: { firstName: true, lastName: true, company: { select: { name: true } } } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      prisma.importExpediente.findMany({
+        where,
+        include: {
+          shipment: { select: { reference: true, status: true } },
+          user: { select: { firstName: true, lastName: true, company: { select: { name: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.importExpediente.count({ where }),
+    ]);
+    return { data, total, page, limit };
   },
 };

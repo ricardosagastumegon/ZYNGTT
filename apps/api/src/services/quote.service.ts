@@ -1,10 +1,10 @@
-import { PrismaClient, TransportMode, ShipmentType } from '@prisma/client';
+﻿import { TransportMode, ShipmentType } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { getMaerskRates } from '../integrations/maersk';
 import { getDHLRates } from '../integrations/dhl';
 import { getGroundRates } from '../integrations/ground';
 import { AppError } from '../utils/AppError';
 
-const prisma = new PrismaClient();
 
 interface CreateQuoteInput {
   type: ShipmentType;
@@ -90,3 +90,4 @@ export const quoteService = {
     return shipment;
   },
 };
+

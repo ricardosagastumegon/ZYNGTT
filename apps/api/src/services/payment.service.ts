@@ -1,9 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+﻿import { prisma } from '../lib/prisma';
 import { createPaymentIntent, constructWebhookEvent, retrievePaymentIntent } from '../integrations/stripe';
 import { AppError } from '../utils/AppError';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
 const COMMISSION_RATE = 0.05;
 
 export const paymentService = {

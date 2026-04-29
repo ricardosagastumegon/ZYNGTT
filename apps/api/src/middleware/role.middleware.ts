@@ -1,8 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { PrismaClient } from '@prisma/client';
+﻿import { Request, Response, NextFunction } from 'express';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../utils/AppError';
 
-const prisma = new PrismaClient();
 
 type AllowedRole = 'EMPRESA' | 'TRANSPORTISTA' | 'AGENTE' | 'ADMIN' | 'SUPERADMIN';
 

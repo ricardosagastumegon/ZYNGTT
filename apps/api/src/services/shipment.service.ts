@@ -1,8 +1,8 @@
-import { PrismaClient, ShipmentStatus } from '@prisma/client';
+﻿import { ShipmentStatus } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { shipmentModel } from '../models/shipment.model';
 import { AppError } from '../utils/AppError';
 
-const prisma = new PrismaClient();
 
 export const shipmentService = {
   async getShipments(userId: string, filters: Record<string, string>, page = 1, limit = 10) {
@@ -32,3 +32,4 @@ export const shipmentService = {
 
   getStats: (userId: string) => shipmentModel.getStats(userId),
 };
+

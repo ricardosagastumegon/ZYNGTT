@@ -1,12 +1,11 @@
-import { Worker } from 'bullmq';
-import { PrismaClient } from '@prisma/client';
+﻿import { Worker } from 'bullmq';
+import { prisma } from '../lib/prisma';
 import { getConnection, enqueueSAT, enqueueSIGIE } from '../automation/automation-queue';
 import { getCredentials } from '../utils/credentials-vault';
 import { login, crearConstancia, consultarEstado, descargarPermiso } from '../automation/sigie-maga.bot';
 import { uploadBuffer } from '../integrations/cloudinary';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
 
 const redisOptions = {
   host: process.env.REDIS_HOST ?? 'localhost',

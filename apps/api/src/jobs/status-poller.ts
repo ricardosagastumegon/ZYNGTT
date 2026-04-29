@@ -1,9 +1,8 @@
-import cron from 'node-cron';
-import { PrismaClient } from '@prisma/client';
+﻿import cron from 'node-cron';
+import { prisma } from '../lib/prisma';
 import { enqueueSIGIE, enqueueSAT } from '../automation/automation-queue';
 import { logger } from '../utils/logger';
 
-const prisma = new PrismaClient();
 const INTERVAL = process.env.STATUS_POLL_INTERVAL ?? '5';
 
 export function startStatusPoller() {

@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+﻿import { Router } from 'express';
+import { prisma } from '../lib/prisma';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { userController } from '../controllers/user.controller';
@@ -9,7 +9,6 @@ import { asyncHandler } from '../middleware/asyncHandler';
 import { activityLogService } from '../services/activity-log.service';
 import { AppError } from '../utils/AppError';
 
-const prisma = new PrismaClient();
 
 export const userRoutes = Router();
 

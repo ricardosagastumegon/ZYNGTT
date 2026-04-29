@@ -1,7 +1,7 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import axios from 'axios';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { v2 as cloudinary } from 'cloudinary';
 import { stripe } from '../integrations/stripe';
 import { authenticate } from '../middleware/auth';
@@ -10,7 +10,6 @@ import { asyncHandler } from '../middleware/asyncHandler';
 import { saveCredentials } from '../utils/credentials-vault';
 import { AppError } from '../utils/AppError';
 
-const prisma = new PrismaClient();
 
 function getCloudinaryStorageMB(u: Record<string, unknown> | null): number | null {
   const storage = u?.storage as Record<string, unknown> | undefined;

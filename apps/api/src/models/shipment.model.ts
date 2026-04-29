@@ -1,6 +1,6 @@
-import { PrismaClient, ShipmentStatus } from '@prisma/client';
+﻿import { ShipmentStatus } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
 
 export const shipmentModel = {
   findById: (id: string, userId: string) =>
@@ -56,3 +56,4 @@ export const shipmentModel = {
     };
   },
 };
+

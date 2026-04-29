@@ -65,10 +65,12 @@ router.post('/lab/:id', upload.single('lab'), asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 }));
 
-// GET /api/import/list — Listar expedientes
+// GET /api/import/list — Listar expedientes (paginado)
 router.get('/list', asyncHandler(async (req, res) => {
-  const data = await importExpedienteService.list(req.user!.userId, req.user!.role);
-  res.json({ success: true, data });
+  const page  = Math.max(1, Number(req.query.page  ?? 1));
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 20)));
+  const result = await importExpedienteService.list(req.user!.userId, req.user!.role, page, limit);
+  res.json({ success: true, ...result });
 }));
 
 // GET /api/import/:id/tributes — Recalcular tributos

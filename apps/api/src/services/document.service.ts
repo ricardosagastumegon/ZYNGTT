@@ -1,8 +1,8 @@
-import { PrismaClient, DocumentType } from '@prisma/client';
+﻿import { DocumentType } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { uploadDocument, deleteDocument, getSignedUrl } from '../integrations/cloudinary';
 import { AppError } from '../utils/AppError';
 
-const prisma = new PrismaClient();
 
 export const documentService = {
   async upload(shipmentId: string, file: Express.Multer.File, type: DocumentType, uploadedById: string) {
@@ -36,3 +36,4 @@ export const documentService = {
     return getSignedUrl(doc.publicId);
   },
 };
+

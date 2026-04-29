@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+﻿import { prisma } from '../lib/prisma';
 import { trackShipment } from '../integrations/shipengine';
 import { AppError } from '../utils/AppError';
 
-const prisma = new PrismaClient();
 
 export const trackingService = {
   async getEvents(shipmentId: string, userId: string) {

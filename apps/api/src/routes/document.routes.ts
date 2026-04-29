@@ -1,11 +1,10 @@
-import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+﻿import { Router } from 'express';
+import { prisma } from '../lib/prisma';
 import { documentController } from '../controllers/document.controller';
 import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { upload } from '../middleware/upload';
 
-const prisma = new PrismaClient();
 
 export const documentRoutes = Router();
 documentRoutes.use(authenticate);

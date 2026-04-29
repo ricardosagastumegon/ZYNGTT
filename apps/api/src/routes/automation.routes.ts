@@ -1,4 +1,5 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
+import { prisma } from '../lib/prisma';
 import { authenticate } from '../middleware/auth';
 import { requireRole, requireSIGIEApproved } from '../middleware/role.middleware';
 import { asyncHandler } from '../middleware/asyncHandler';
@@ -37,8 +38,7 @@ router.post('/sigie/:id',
 // GET /api/automation/sigie/:id — Ver estado SIGIE del expediente
 router.get('/sigie/:id', asyncHandler(async (req, res) => {
   const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient();
-  const exp = await prisma.importExpediente.findFirst({
+    const exp = await prisma.importExpediente.findFirst({
     where: { id: req.params.id },
     select: { sigieStatus: true, sigieNumSolicitud: true, sigieAprobadoAt: true, sigiePermitUrl: true, status: true },
   });
@@ -59,8 +59,7 @@ router.post('/sat/:id',
 // GET /api/automation/sat/semaforo/:id — Ver semáforo SAT
 router.get('/sat/semaforo/:id', asyncHandler(async (req, res) => {
   const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient();
-  const exp = await prisma.importExpediente.findFirst({
+    const exp = await prisma.importExpediente.findFirst({
     where: { id: req.params.id },
     select: { satSemaforo: true, ducaDNumero: true, satOrdenNumero: true, satTransmitidaAt: true, satLiberadaAt: true, status: true },
   });
@@ -82,3 +81,4 @@ router.get('/jobs/:jobId', asyncHandler(async (req, res) => {
 }));
 
 export default router;
+

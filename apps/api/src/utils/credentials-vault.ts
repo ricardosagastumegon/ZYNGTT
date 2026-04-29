@@ -1,7 +1,6 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
-import { PrismaClient } from '@prisma/client';
+﻿import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { prisma } from '../lib/prisma';
 
-const prisma = new PrismaClient();
 
 const ALGO = 'aes-256-cbc';
 

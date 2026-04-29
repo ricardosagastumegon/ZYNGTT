@@ -1,8 +1,8 @@
-import { PrismaClient, CustomsStatus } from '@prisma/client';
+﻿import { CustomsStatus } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { getRequirementsByHsCode, STANDARD_DOCS } from '../data/customs-requirements';
 import { AppError } from '../utils/AppError';
 
-const prisma = new PrismaClient();
 
 export const customsService = {
   async createRecord(shipmentId: string, userId: string, data: { hsCode?: string; description?: string; value?: number; agent?: string }) {
@@ -40,3 +40,4 @@ export const customsService = {
 
   getRequirementsByHsCode: (hsCode: string) => ({ requirements: getRequirementsByHsCode(hsCode) }),
 };
+
