@@ -5,20 +5,67 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Logo } from '@/components/Logo';
 import {
-  LayoutDashboard, ArrowDownToLine, ArrowUpFromLine,
-  FileText, MapPin, CreditCard, Settings, LogOut, Menu, X,
+  LayoutDashboard, ArrowDownToLine, ArrowUpFromLine, FileText,
+  MapPin, CreditCard, Settings, LogOut, Menu, X,
+  Building2, Users, UserCheck, Truck, ClipboardList,
+  Send, History, UserCircle, PackagePlus,
 } from 'lucide-react';
 
-const navItems = [
-  { href: '/dashboard',        label: 'Dashboard',     icon: LayoutDashboard },
-  { href: '/shipments',        label: 'Envíos',        icon: ArrowDownToLine },
-  { href: '/food-import',      label: 'Importaciones', icon: ArrowUpFromLine },
-  { href: '/quotes',           label: 'Cotizaciones',  icon: FileText },
-  { href: '/documents',        label: 'Documentos',    icon: FileText },
-  { href: '/tracking',         label: 'Tracking',      icon: MapPin },
-  { href: '/payments/history', label: 'Pagos',         icon: CreditCard },
-  { href: '/settings',         label: 'Configuración', icon: Settings },
-];
+const ROL_LABELS: Record<string, string> = {
+  SUPERADMIN: 'Super Administrador',
+  ADMIN: 'Administrador',
+  EMPRESA: 'Empresa',
+  AGENTE: 'Agente Aduanal',
+  TRANSPORTISTA: 'Transportista',
+};
+
+type NavItem = { href: string; label: string; icon: React.ElementType };
+
+const NAV_BY_ROLE: Record<string, NavItem[]> = {
+  SUPERADMIN: [
+    { href: '/dashboard/admin',   label: 'Dashboard',       icon: LayoutDashboard },
+    { href: '/empresas',          label: 'Empresas',        icon: Building2 },
+    { href: '/agentes',           label: 'Agentes',         icon: UserCheck },
+    { href: '/transportistas',    label: 'Transportistas',  icon: Truck },
+    { href: '/import',            label: 'Importaciones',   icon: ArrowDownToLine },
+    { href: '/export',            label: 'Exportaciones',   icon: ArrowUpFromLine },
+    { href: '/documents',         label: 'Documentos',      icon: FileText },
+    { href: '/usuarios',          label: 'Usuarios',        icon: Users },
+    { href: '/settings',          label: 'Configuración',   icon: Settings },
+  ],
+  ADMIN: [
+    { href: '/dashboard/admin',   label: 'Dashboard',       icon: LayoutDashboard },
+    { href: '/empresas',          label: 'Empresas',        icon: Building2 },
+    { href: '/agentes',           label: 'Agentes',         icon: UserCheck },
+    { href: '/transportistas',    label: 'Transportistas',  icon: Truck },
+    { href: '/import',            label: 'Importaciones',   icon: ArrowDownToLine },
+    { href: '/export',            label: 'Exportaciones',   icon: ArrowUpFromLine },
+    { href: '/documents',         label: 'Documentos',      icon: FileText },
+    { href: '/usuarios',          label: 'Usuarios',        icon: Users },
+    { href: '/settings',          label: 'Configuración',   icon: Settings },
+  ],
+  EMPRESA: [
+    { href: '/dashboard/empresa', label: 'Dashboard',          icon: LayoutDashboard },
+    { href: '/import/new',        label: 'Nueva Importación',  icon: PackagePlus },
+    { href: '/import',            label: 'Mis Expedientes',    icon: ClipboardList },
+    { href: '/documents',         label: 'Documentos',         icon: FileText },
+    { href: '/payments/history',  label: 'Pagos',              icon: CreditCard },
+    { href: '/settings',          label: 'Mi Cuenta',          icon: UserCircle },
+  ],
+  AGENTE: [
+    { href: '/dashboard/agente',  label: 'Dashboard',              icon: LayoutDashboard },
+    { href: '/import',            label: 'Expedientes Pendientes', icon: ClipboardList },
+    { href: '/import?tab=transmitir', label: 'Transmitir DUCA',   icon: Send },
+    { href: '/import?tab=historial',  label: 'Historial',         icon: History },
+    { href: '/settings',          label: 'Mi Perfil',             icon: UserCircle },
+  ],
+  TRANSPORTISTA: [
+    { href: '/dashboard/transporte', label: 'Dashboard',     icon: LayoutDashboard },
+    { href: '/shipments',            label: 'Mis Envíos',    icon: Truck },
+    { href: '/tracking',             label: 'Tracking',      icon: MapPin },
+    { href: '/settings',             label: 'Mi Perfil',     icon: UserCircle },
+  ],
+};
 
 function SidebarContent({ pathname, user, logout, onClose }: {
   pathname: string;
@@ -26,6 +73,9 @@ function SidebarContent({ pathname, user, logout, onClose }: {
   logout: () => void;
   onClose?: () => void;
 }) {
+  const role = user?.role ?? 'EMPRESA';
+  const navItems = NAV_BY_ROLE[role] ?? NAV_BY_ROLE.EMPRESA;
+
   return (
     <>
       {/* Logo */}
@@ -44,9 +94,10 @@ function SidebarContent({ pathname, user, logout, onClose }: {
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
         {navItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || (href !== '/dashboard' && pathname.startsWith(href + '/'));
+          const basePath = href.split('?')[0];
+          const active = pathname === basePath || (basePath !== '/dashboard/admin' && basePath !== '/dashboard/agente' && basePath !== '/dashboard/empresa' && basePath !== '/dashboard/transporte' && basePath !== '/dashboard' && pathname.startsWith(basePath + '/'));
           return (
             <Link key={href} href={href} onClick={onClose} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
@@ -66,10 +117,13 @@ function SidebarContent({ pathname, user, logout, onClose }: {
         })}
       </nav>
 
-      {/* Footer */}
+      {/* Footer — nombre + rol en español */}
       <div style={{ padding: '14px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-body)', marginBottom: 10 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: '#fff', fontFamily: 'var(--font-body)', marginBottom: 2 }}>
           {user?.firstName} {user?.lastName}
+        </p>
+        <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontFamily: 'var(--font-body)', marginBottom: 12 }}>
+          {ROL_LABELS[role] ?? role}
         </p>
         <button onClick={logout} style={{
           display: 'flex', alignItems: 'center', gap: 8, fontSize: 12,
