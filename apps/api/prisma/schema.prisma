@@ -126,6 +126,10 @@ model User {
   foodImports     FoodImport[]
   expedientes     ImportExpediente[]
   credentials     UserCredentials[]
+  activityLogs    ActivityLog[]
+  isActive        Boolean           @default(true)
+  phone           String?
+  metadata        Json?
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
@@ -459,4 +463,18 @@ model UserCredentials {
 
   @@unique([userId, system])
   @@index([userId])
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action      String
+  description String
+  metadata    Json?
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
 }

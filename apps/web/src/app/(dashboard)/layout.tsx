@@ -7,43 +7,42 @@ import { Logo } from '@/components/Logo';
 import {
   LayoutDashboard, ArrowDownToLine, ArrowUpFromLine, FileText,
   MapPin, CreditCard, Settings, LogOut, Menu, X,
-  Building2, Users, UserCheck, Truck, ClipboardList,
+  Users, UserCheck, Truck, ClipboardList,
   Send, History, UserCircle, PackagePlus,
+  GitMerge, Plug, Activity, Building2,
 } from 'lucide-react';
 
 const ROL_LABELS: Record<string, string> = {
-  SUPERADMIN: 'Super Administrador',
-  ADMIN: 'Administrador',
-  EMPRESA: 'Empresa',
-  AGENTE: 'Agente Aduanal',
-  TRANSPORTISTA: 'Transportista',
+  SUPERADMIN: 'Super Administrador', ADMIN: 'Administrador',
+  EMPRESA: 'Empresa', AGENTE: 'Agente Aduanal', TRANSPORTISTA: 'Transportista',
 };
 
-type NavItem = { href: string; label: string; icon: React.ElementType };
+// NavItem can be a section separator or a regular link
+type NavItem =
+  | { section: string }
+  | { href: string; label: string; icon: React.ElementType };
+
+const isSection = (item: NavItem): item is { section: string } => 'section' in item;
+
+const ADMIN_NAV: NavItem[] = [
+  { href: '/dashboard/admin',        label: 'Dashboard',       icon: LayoutDashboard },
+  { section: 'Operaciones' },
+  { href: '/import',                 label: 'Importaciones',   icon: ArrowDownToLine },
+  { href: '/export',                 label: 'Exportaciones',   icon: ArrowUpFromLine },
+  { href: '/documents',              label: 'Documentos',      icon: FileText },
+  { section: 'Administración' },
+  { href: '/admin/usuarios',         label: 'Usuarios',        icon: Users },
+  { href: '/admin/empresas',         label: 'Empresas',        icon: Building2 },
+  { href: '/admin/assignments',      label: 'Asignaciones',    icon: GitMerge },
+  { section: 'Sistema' },
+  { href: '/admin/integraciones',    label: 'Integraciones',   icon: Plug },
+  { href: '/admin/logs',             label: 'Logs de actividad', icon: Activity },
+  { href: '/settings',               label: 'Configuración',   icon: Settings },
+];
 
 const NAV_BY_ROLE: Record<string, NavItem[]> = {
-  SUPERADMIN: [
-    { href: '/dashboard/admin',   label: 'Dashboard',       icon: LayoutDashboard },
-    { href: '/empresas',          label: 'Empresas',        icon: Building2 },
-    { href: '/agentes',           label: 'Agentes',         icon: UserCheck },
-    { href: '/transportistas',    label: 'Transportistas',  icon: Truck },
-    { href: '/import',            label: 'Importaciones',   icon: ArrowDownToLine },
-    { href: '/export',            label: 'Exportaciones',   icon: ArrowUpFromLine },
-    { href: '/documents',         label: 'Documentos',      icon: FileText },
-    { href: '/usuarios',          label: 'Usuarios',        icon: Users },
-    { href: '/settings',          label: 'Configuración',   icon: Settings },
-  ],
-  ADMIN: [
-    { href: '/dashboard/admin',   label: 'Dashboard',       icon: LayoutDashboard },
-    { href: '/empresas',          label: 'Empresas',        icon: Building2 },
-    { href: '/agentes',           label: 'Agentes',         icon: UserCheck },
-    { href: '/transportistas',    label: 'Transportistas',  icon: Truck },
-    { href: '/import',            label: 'Importaciones',   icon: ArrowDownToLine },
-    { href: '/export',            label: 'Exportaciones',   icon: ArrowUpFromLine },
-    { href: '/documents',         label: 'Documentos',      icon: FileText },
-    { href: '/usuarios',          label: 'Usuarios',        icon: Users },
-    { href: '/settings',          label: 'Configuración',   icon: Settings },
-  ],
+  SUPERADMIN: ADMIN_NAV,
+  ADMIN:      ADMIN_NAV,
   EMPRESA: [
     { href: '/dashboard/empresa', label: 'Dashboard',          icon: LayoutDashboard },
     { href: '/import/new',        label: 'Nueva Importación',  icon: PackagePlus },
@@ -53,17 +52,17 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { href: '/settings',          label: 'Mi Cuenta',          icon: UserCircle },
   ],
   AGENTE: [
-    { href: '/dashboard/agente',  label: 'Dashboard',              icon: LayoutDashboard },
-    { href: '/import',            label: 'Expedientes Pendientes', icon: ClipboardList },
-    { href: '/import?tab=transmitir', label: 'Transmitir DUCA',   icon: Send },
-    { href: '/import?tab=historial',  label: 'Historial',         icon: History },
-    { href: '/settings',          label: 'Mi Perfil',             icon: UserCircle },
+    { href: '/dashboard/agente',      label: 'Dashboard',              icon: LayoutDashboard },
+    { href: '/import',                label: 'Expedientes Pendientes', icon: ClipboardList },
+    { href: '/import?tab=transmitir', label: 'Transmitir DUCA',        icon: Send },
+    { href: '/import?tab=historial',  label: 'Historial',              icon: History },
+    { href: '/settings',              label: 'Mi Perfil',              icon: UserCircle },
   ],
   TRANSPORTISTA: [
-    { href: '/dashboard/transporte', label: 'Dashboard',     icon: LayoutDashboard },
-    { href: '/shipments',            label: 'Mis Envíos',    icon: Truck },
-    { href: '/tracking',             label: 'Tracking',      icon: MapPin },
-    { href: '/settings',             label: 'Mi Perfil',     icon: UserCircle },
+    { href: '/dashboard/transporte', label: 'Dashboard',  icon: LayoutDashboard },
+    { href: '/shipments',            label: 'Mis Envíos', icon: Truck },
+    { href: '/tracking',             label: 'Tracking',   icon: MapPin },
+    { href: '/settings',             label: 'Mi Perfil',  icon: UserCircle },
   ],
 };
 
@@ -73,7 +72,7 @@ function SidebarContent({ pathname, user, logout, onClose }: {
   logout: () => void;
   onClose?: () => void;
 }) {
-  const role = user?.role ?? 'EMPRESA';
+  const role     = user?.role ?? 'EMPRESA';
   const navItems = NAV_BY_ROLE[role] ?? NAV_BY_ROLE.EMPRESA;
 
   return (
@@ -95,11 +94,25 @@ function SidebarContent({ pathname, user, logout, onClose }: {
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 10px', display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto' }}>
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const basePath = href.split('?')[0];
-          const active = pathname === basePath || (basePath !== '/dashboard/admin' && basePath !== '/dashboard/agente' && basePath !== '/dashboard/empresa' && basePath !== '/dashboard/transporte' && basePath !== '/dashboard' && pathname.startsWith(basePath + '/'));
+        {navItems.map((item, i) => {
+          if (isSection(item)) {
+            return (
+              <p key={`section-${i}`} style={{
+                fontSize: 10, fontWeight: 600, letterSpacing: '0.08em',
+                color: 'rgba(255,255,255,0.30)', textTransform: 'uppercase',
+                padding: '12px 12px 4px', fontFamily: 'var(--font-body)',
+              }}>
+                {item.section}
+              </p>
+            );
+          }
+
+          const basePath = item.href.split('?')[0];
+          const isDashboard = ['/dashboard/admin', '/dashboard/agente', '/dashboard/empresa', '/dashboard/transporte', '/dashboard'].includes(basePath);
+          const active = pathname === basePath || (!isDashboard && pathname.startsWith(basePath + '/'));
+
           return (
-            <Link key={href} href={href} onClick={onClose} style={{
+            <Link key={item.href} href={item.href} onClick={onClose} style={{
               display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
               borderRadius: 'var(--radius-md)', fontSize: 13, fontFamily: 'var(--font-body)',
               fontWeight: active ? 600 : 400,
@@ -110,14 +123,14 @@ function SidebarContent({ pathname, user, logout, onClose }: {
             onMouseEnter={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)'; }}
             onMouseLeave={e => { if (!active) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
             >
-              <Icon size={16} strokeWidth={active ? 2.5 : 2} />
-              {label}
+              <item.icon size={16} strokeWidth={active ? 2.5 : 2} />
+              {item.label}
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer — nombre + rol en español */}
+      {/* Footer */}
       <div style={{ padding: '14px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
         <p style={{ fontSize: 13, fontWeight: 600, color: '#fff', fontFamily: 'var(--font-body)', marginBottom: 2 }}>
           {user?.firstName} {user?.lastName}
@@ -163,8 +176,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Mobile drawer */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex flex-col md:hidden transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
-        style={{ width: 240, background: 'var(--sidebar-bg)', color: '#fff' }}>
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col md:hidden transition-transform duration-200 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{ width: 240, background: 'var(--sidebar-bg)', color: '#fff' }}
+      >
         <SidebarContent pathname={pathname} user={user} logout={logout} onClose={() => setMobileOpen(false)} />
       </aside>
 

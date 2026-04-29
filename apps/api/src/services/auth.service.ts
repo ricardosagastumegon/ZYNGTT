@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { userModel } from '../models/user.model';
 import { generateToken, generateRefreshToken, verifyRefreshToken } from '../utils/jwt';
 import { AppError } from '../utils/AppError';
+import { activityLogService } from './activity-log.service';
 
 function sanitizeUser(user: { password?: string; [key: string]: unknown }) {
   const { password, ...safe } = user;
@@ -33,7 +34,12 @@ export const authService = {
     if (!user) throw new AppError('Invalid credentials', 401);
 
     const valid = await bcrypt.compare(password, user.password);
-    if (!valid) throw new AppError('Invalid credentials', 401);
+    if (!valid) {
+      await activityLogService.log(user.id, 'LOGIN_FAILED', 'Intento de login fallido');
+      throw new AppError('Invalid credentials', 401);
+    }
+
+    await activityLogService.log(user.id, 'LOGIN', 'Inicio de sesión exitoso');
 
     const token = generateToken({ userId: user.id, email: user.email, role: user.role });
     const refreshToken = generateRefreshToken({ userId: user.id, email: user.email, role: user.role });
