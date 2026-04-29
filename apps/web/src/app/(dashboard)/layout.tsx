@@ -10,13 +10,14 @@ import {
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/dashboard',  label: 'Dashboard',     icon: LayoutDashboard },
-  { href: '/import',     label: 'Importaciones', icon: ArrowDownToLine },
-  { href: '/export',     label: 'Exportaciones', icon: ArrowUpFromLine },
-  { href: '/documents',  label: 'Documentos',    icon: FileText },
-  { href: '/tracking',   label: 'Tracking',      icon: MapPin },
-  { href: '/payments',   label: 'Pagos',         icon: CreditCard },
-  { href: '/settings',   label: 'Configuración', icon: Settings },
+  { href: '/dashboard',        label: 'Dashboard',     icon: LayoutDashboard },
+  { href: '/shipments',        label: 'Envíos',        icon: ArrowDownToLine },
+  { href: '/food-import',      label: 'Importaciones', icon: ArrowUpFromLine },
+  { href: '/quotes',           label: 'Cotizaciones',  icon: FileText },
+  { href: '/documents',        label: 'Documentos',    icon: FileText },
+  { href: '/tracking',         label: 'Tracking',      icon: MapPin },
+  { href: '/payments/history', label: 'Pagos',         icon: CreditCard },
+  { href: '/settings',         label: 'Configuración', icon: Settings },
 ];
 
 function SidebarContent({ pathname, user, logout, onClose }: {

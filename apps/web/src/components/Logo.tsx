@@ -29,7 +29,7 @@ function LogoText({ color = PRIMARY }: { color?: string }) {
       letterSpacing: '-0.02em',
       color,
     }}>
-      AXON
+      ZYN
     </span>
   );
 }
