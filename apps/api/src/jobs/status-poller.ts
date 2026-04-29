@@ -24,7 +24,7 @@ async function pollSIGIE() {
     const pending = await prisma.importExpediente.findMany({
       where: {
         sigieStatus: { in: ['SOLICITADO', 'EN_REVISION', 'RECIBIDA'] },
-        sigieNumSolicitud: { not: null },
+        sigiePermisos: { some: { status: 'SOLICITADO', controlElectronico: { not: null } } },
       },
       select: { id: true },
     });

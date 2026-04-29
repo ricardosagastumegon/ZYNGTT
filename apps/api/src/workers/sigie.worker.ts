@@ -1,4 +1,4 @@
-﻿import { Worker } from 'bullmq';
+import { Worker } from 'bullmq';
 import { prisma } from '../lib/prisma';
 import { getConnection, enqueueSAT, enqueueSIGIE } from '../automation/automation-queue';
 import { getCredentials } from '../utils/credentials-vault';
@@ -6,6 +6,7 @@ import { login, crearConstancia, consultarEstado, descargarPermiso } from '../au
 import { uploadBuffer } from '../integrations/cloudinary';
 import { logger } from '../utils/logger';
 
+type Mercancia = { fraccion: string; cantidadKG: number; valorUSD?: number; nombre?: string; labRequerido?: boolean };
 
 const redisOptions = {
   host: process.env.REDIS_HOST ?? 'localhost',
@@ -16,12 +17,19 @@ const redisOptions = {
 export const sigieWorker = new Worker(
   'sigie-jobs',
   async (job) => {
-    const { type, expedienteId } = job.data as { type?: string; expedienteId: string };
+    const { type, expedienteId, permisoId } = job.data as {
+      type?: string;
+      expedienteId: string;
+      permisoId?: string;
+    };
     const jobType = type ?? job.name;
 
     logger.info(`SIGIE worker processing: ${jobType} for ${expedienteId}`);
 
-    const exp = await prisma.importExpediente.findUnique({ where: { id: expedienteId } });
+    const exp = await prisma.importExpediente.findUnique({
+      where: { id: expedienteId },
+      include: { sigiePermisos: true },
+    });
     if (!exp) throw new Error(`Expediente ${expedienteId} not found`);
 
     const creds = await getCredentials(exp.userId, 'SIGIE');
@@ -29,37 +37,64 @@ export const sigieWorker = new Worker(
 
     switch (jobType) {
       case 'CREATE_CONSTANCIA': {
-        const page = await login(creds);
-        const mercancias = exp.mercancias as { fraccion: string; cantidadKG: number; valorUSD?: number; nombre?: string }[];
-        const firstMerc = mercancias[0];
+        const mercancias = exp.mercancias as Mercancia[];
 
+        // Ensure a SIGIEPermiso record exists per product
+        for (const merc of mercancias) {
+          const exists = exp.sigiePermisos.find(p => p.fraccionArancelaria === merc.fraccion);
+          if (!exists) {
+            await prisma.sIGIEPermiso.create({
+              data: {
+                expedienteId,
+                producto: merc.nombre ?? merc.fraccion,
+                fraccionArancelaria: merc.fraccion,
+                pesoNetoKG: merc.cantidadKG,
+                cantidadBultos: 1,
+                tipoBulto: 'CAJA',
+                numFactura: exp.cfdiFolio ?? undefined,
+                numCertFitoMX: exp.fitoMXNumero ?? undefined,
+                paisOrigen: 'MÉXICO',
+              },
+            });
+          }
+        }
+
+        // Process first pending permiso
+        const pending = await prisma.sIGIEPermiso.findFirst({
+          where: { expedienteId, status: 'PENDIENTE' },
+        });
+        if (!pending) {
+          logger.info(`All permisos already processed for ${expedienteId}`);
+          break;
+        }
+
+        const page = await login(creds);
         const result = await crearConstancia(page, {
           impNIT: exp.impNIT ?? '',
           impNombre: exp.impNombre,
           expNombre: exp.expNombre,
           expRFC: exp.expRFC,
           producto: {
-            descripcion: firstMerc?.nombre ?? 'Producto agrícola',
-            hsCode: firstMerc?.fraccion ?? '',
-            cantidadKG: firstMerc?.cantidadKG ?? exp.pesoTotalKG,
-            valorUSD: firstMerc?.valorUSD ?? exp.totalUSD,
+            descripcion: pending.producto,
+            hsCode: pending.fraccionArancelaria ?? '',
+            cantidadKG: pending.pesoNetoKG,
+            valorUSD: exp.totalUSD,
             paisOrigen: 'Mexico',
           },
-          fitoMXNumero: exp.fitoMXNumero ?? undefined,
+          fitoMXNumero: pending.numCertFitoMX ?? undefined,
           aduanaEntrada: exp.aduanaEntradaGT ?? 'ADUANA TECUN UMAN II',
           fechaEstimada: exp.fechaCruce ? new Date(exp.fechaCruce) : undefined,
         });
-
         await page.context().close().catch(() => {});
 
         if (result.success) {
+          await prisma.sIGIEPermiso.update({
+            where: { id: pending.id },
+            data: { status: 'SOLICITADO', controlElectronico: result.solicitudNumero },
+          });
           await prisma.importExpediente.update({
             where: { id: expedienteId },
-            data: {
-              sigieNumSolicitud: result.solicitudNumero,
-              sigieStatus: 'SOLICITADO',
-              status: 'SIGIE_SOLICITADO',
-            },
+            data: { sigieStatus: 'SOLICITADO', status: 'SIGIE_SOLICITADO' },
           });
           logger.info(`SIGIE constancia created: ${result.solicitudNumero}`);
         } else {
@@ -69,54 +104,72 @@ export const sigieWorker = new Worker(
       }
 
       case 'CHECK_STATUS': {
-        if (!exp.sigieNumSolicitud) return;
-
-        const page = await login(creds);
-        const status = await consultarEstado(page, exp.sigieNumSolicitud);
-        await page.context().close().catch(() => {});
-
-        const sigieStatus = status.status;
-        const newStatus = sigieStatus === 'APROBADO' ? 'SIGIE_APROBADO' : exp.status;
-
-        await prisma.importExpediente.update({
-          where: { id: expedienteId },
-          data: { sigieStatus, status: newStatus as never },
+        const solicitados = await prisma.sIGIEPermiso.findMany({
+          where: { expedienteId, status: 'SOLICITADO', controlElectronico: { not: null } },
         });
 
-        if (sigieStatus === 'APROBADO') {
-          logger.info(`SIGIE approved for ${expedienteId}, downloading permit`);
-          await enqueueSIGIE('DOWNLOAD_PERMIT', expedienteId);
+        for (const permiso of solicitados) {
+          if (!permiso.controlElectronico) continue;
+          const page = await login(creds);
+          const statusResult = await consultarEstado(page, permiso.controlElectronico);
+          await page.context().close().catch(() => {});
+
+          if (statusResult.status === 'APROBADO') {
+            await prisma.sIGIEPermiso.update({
+              where: { id: permiso.id },
+              data: { status: 'APROBADO' },
+            });
+            await enqueueSIGIE('DOWNLOAD_PERMIT', expedienteId, { permisoId: permiso.id });
+          }
+        }
+
+        // If all permisos approved → advance expediente
+        const all = await prisma.sIGIEPermiso.findMany({ where: { expedienteId } });
+        if (all.length > 0 && all.every(p => p.status === 'APROBADO')) {
+          await prisma.importExpediente.update({
+            where: { id: expedienteId },
+            data: { sigieStatus: 'APROBADO', status: 'SIGIE_APROBADO' },
+          });
         }
         break;
       }
 
       case 'DOWNLOAD_PERMIT': {
-        if (!exp.sigieNumSolicitud) return;
+        const targets = permisoId
+          ? await prisma.sIGIEPermiso.findMany({ where: { id: permisoId } })
+          : await prisma.sIGIEPermiso.findMany({
+              where: { expedienteId, status: 'APROBADO', permisoFitoUrl: null },
+            });
 
-        const page = await login(creds);
-        const permitBuf = await descargarPermiso(page, exp.sigieNumSolicitud);
-        await page.context().close().catch(() => {});
+        for (const permiso of targets) {
+          if (!permiso.controlElectronico) continue;
+          const page = await login(creds);
+          const buf = await descargarPermiso(page, permiso.controlElectronico);
+          await page.context().close().catch(() => {});
 
-        if (permitBuf) {
-          const upload = await uploadBuffer(permitBuf, `axon/expedientes/${expedienteId}/sigie-permit`, 'raw');
-          await prisma.importExpediente.update({
-            where: { id: expedienteId },
-            data: {
-              sigiePermitUrl: upload.secure_url,
-              sigieAprobadoAt: new Date(),
-              status: 'DUCA_LISTA',
-            },
-          });
-          logger.info(`SIGIE permit downloaded and stored for ${expedienteId}`);
+          if (buf) {
+            const upload = await uploadBuffer(
+              buf,
+              `axon/expedientes/${expedienteId}/sigie-${permiso.id}`,
+              'raw',
+            );
+            await prisma.sIGIEPermiso.update({
+              where: { id: permiso.id },
+              data: { permisoFitoUrl: upload.secure_url },
+            });
+          }
         }
+
+        await prisma.importExpediente.update({
+          where: { id: expedienteId },
+          data: { sigieAprobadoAt: new Date(), status: 'DUCA_LISTA' },
+        });
+        logger.info(`SIGIE permits downloaded for ${expedienteId}`);
         break;
       }
     }
   },
-  {
-    connection: redisOptions,
-    concurrency: 2,
-  }
+  { connection: redisOptions, concurrency: 2 },
 );
 
 sigieWorker.on('completed', (job) => logger.info(`SIGIE job ${job.id} completed`));

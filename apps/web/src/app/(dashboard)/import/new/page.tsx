@@ -48,7 +48,6 @@ export default function NewImportPage() {
   const [error, setError] = useState('');
 
   // Step 1
-  const [shipmentId, setShipmentId] = useState('');
   const [cfdiFile, setCfdiFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CFDIPreview | null>(null);
 
@@ -66,12 +65,12 @@ export default function NewImportPage() {
   const [docsGenerated, setDocsGenerated] = useState(false);
 
   async function handleCFDIUpload() {
-    if (!cfdiFile || !shipmentId) { setError('Selecciona el archivo CFDI y el ID del envío'); return; }
+    if (!cfdiFile) { setError('Selecciona el archivo CFDI XML'); return; }
     setLoading(true); setError('');
     try {
       const form = new FormData();
       form.append('cfdi', cfdiFile);
-      const res = await api.post(`/api/import/parse-cfdi/${shipmentId}`, form, {
+      const res = await api.post('/api/import/parse-cfdi', form, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       const exp = res.data.data;
@@ -169,20 +168,6 @@ export default function NewImportPage() {
 
           <div>
             <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>
-              ID del Envío (Shipment ID)
-            </label>
-            <input
-              type="text"
-              value={shipmentId}
-              onChange={e => setShipmentId(e.target.value)}
-              placeholder="cuid del envío..."
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2"
-              style={{ borderColor: 'var(--color-border)', fontFamily: 'var(--font-mono)' }}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>
               Archivo CFDI 4.0 (XML)
             </label>
             <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer hover:bg-gray-50 transition"
@@ -193,7 +178,7 @@ export default function NewImportPage() {
             </label>
           </div>
 
-          <button onClick={handleCFDIUpload} disabled={loading || !cfdiFile || !shipmentId}
+          <button onClick={handleCFDIUpload} disabled={loading || !cfdiFile}
             className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50 transition"
             style={{ background: 'var(--brand-primary)' }}>
             {loading ? 'Procesando CFDI...' : 'Procesar CFDI →'}

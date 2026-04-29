@@ -23,14 +23,15 @@ interface TransportData {
   fechaCruce?: string;
 }
 
+function generateReference(): string {
+  const date = new Date();
+  const ymd = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `IMP-${ymd}-${rand}`;
+}
+
 export const importExpedienteService = {
-  async parseCFDIAndCreate(shipmentId: string, xmlBuffer: Buffer, userId: string) {
-    const shipment = await prisma.shipment.findFirst({ where: { id: shipmentId, userId } });
-    if (!shipment) throw new AppError('Envío no encontrado', 404);
-
-    const existing = await prisma.importExpediente.findUnique({ where: { shipmentId } });
-    if (existing) throw new AppError('El expediente ya existe para este envío', 409);
-
+  async parseCFDIAndCreate(xmlBuffer: Buffer, userId: string) {
     const cfdi = parseCFDI(xmlBuffer.toString('utf-8'));
 
     const mercancias: Mercancia[] = (cfdi.comercioExterior?.mercancias ?? []).map(m => ({
@@ -52,15 +53,36 @@ export const importExpedienteService = {
     const pesoTotal = mercancias.reduce((acc, m) => acc + (m.cantidadKG ?? 0), 0);
     const totalUSD = cfdi.comercioExterior?.totalUSD ?? cfdi.totalUSD;
     const incoterm = cfdi.comercioExterior?.claveDePedimento === 'A1' ? 'FOB' : (cfdi.comercioExterior?.claveDePedimento ?? 'FOB');
-
     const tributos = calcularTributos(mercancias, 350, incoterm, cfdi.tipoCambio ?? 7.75);
-
-    // Detect HS lab requirements
     const labReq = mercancias.some(m => getHSInfo(m.fraccion)?.requiereLabMX);
+
+    // Auto-create a draft Shipment from CFDI data — user never needs to enter an ID
+    let reference = generateReference();
+    let attempts = 0;
+    while (attempts < 5) {
+      const exists = await prisma.shipment.findUnique({ where: { reference } });
+      if (!exists) break;
+      reference = generateReference();
+      attempts++;
+    }
+
+    const shipment = await prisma.shipment.create({
+      data: {
+        reference,
+        type: 'IMPORT',
+        mode: 'GROUND',
+        status: 'DRAFT',
+        origin: 'México',
+        destination: 'Guatemala',
+        description: mercancias[0]?.nombre ?? cfdi.conceptos[0]?.descripcion ?? 'Importación MX→GT',
+        weight: pesoTotal || undefined,
+        userId,
+      },
+    });
 
     const expediente = await prisma.importExpediente.create({
       data: {
-        shipmentId,
+        shipmentId: shipment.id,
         userId,
         cfdiUUID: cfdi.folio,
         cfdiFolio: cfdi.folio ?? '',
@@ -83,7 +105,7 @@ export const importExpedienteService = {
       },
     });
 
-    return expediente;
+    return { ...expediente, shipment: { id: shipment.id, reference: shipment.reference } };
   },
 
   async addTransportData(id: string, data: TransportData, userId: string) {

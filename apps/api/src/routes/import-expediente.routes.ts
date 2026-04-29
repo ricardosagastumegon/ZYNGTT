@@ -11,12 +11,10 @@ const router = Router();
 
 router.use(authenticate);
 
-// POST /api/import/parse-cfdi/:shipmentId — Parsear CFDI XML y crear expediente
-router.post('/parse-cfdi/:shipmentId', upload.single('cfdi'), asyncHandler(async (req, res) => {
+// POST /api/import/parse-cfdi — Parsear CFDI XML, crear Shipment + Expediente automáticamente
+router.post('/parse-cfdi', upload.single('cfdi'), asyncHandler(async (req, res) => {
   if (!req.file) throw new Error('Archivo CFDI requerido');
-  const data = await importExpedienteService.parseCFDIAndCreate(
-    req.params.shipmentId, req.file.buffer, req.user!.userId
-  );
+  const data = await importExpedienteService.parseCFDIAndCreate(req.file.buffer, req.user!.userId);
   res.status(201).json({ success: true, data });
 }));
 

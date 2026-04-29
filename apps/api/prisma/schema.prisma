@@ -382,17 +382,24 @@ model ImportExpediente {
   mercancias        Json
   pesoTotalKG       Float
 
-  // Transporte
-  transporteEmpresa String?
-  transporteCAAT    String?
-  pilotoNombre      String?
-  pilotoLicencia    String?
-  cabezalPlaca      String?
-  cabezalTarjeta    String?
-  furgonPlaca       String?
-  furgonTarjeta     String?
-  numEconomico      String?
-  fleteCosto        Float?
+  // Transporte (catálogos)
+  transporteEmpresaId String?
+  transporteEmpresa   TransportEmpresa? @relation(fields: [transporteEmpresaId], references: [id])
+  pilotoId            String?
+  piloto              Piloto?           @relation(fields: [pilotoId], references: [id])
+  cabezalId           String?
+  cabezal             Cabezal?          @relation(fields: [cabezalId], references: [id])
+  cajaId              String?
+  caja                Caja?             @relation(fields: [cajaId], references: [id])
+  fleteCosto          Float?
+
+  // Origen / Destino
+  origenDireccion     String?
+  origenCiudad        String?
+  origenPais          String            @default("MX")
+  destinoDireccion    String?
+  destinoCiudad       String?
+  destinoPais         String            @default("GT")
 
   // Aduanas
   aduanaSalidaMX    String            @default("ADUANA SUCHIATE II")
@@ -424,7 +431,7 @@ model ImportExpediente {
   // SIGIE/MAGA
   sigieCredUser     String?
   sigieCredPass     String?
-  sigieNumSolicitud String?           @unique
+  sigiePermisos     SIGIEPermiso[]
   sigieStatus       String            @default("PENDIENTE")
   sigieAprobadoAt   DateTime?
   sigiePermitUrl    String?
@@ -477,4 +484,95 @@ model ActivityLog {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model TransportEmpresa {
+  id          String             @id @default(cuid())
+  nombre      String
+  CAAT        String             @unique
+  telefono    String?
+  activo      Boolean            @default(true)
+  pilotos     Piloto[]
+  cabezales   Cabezal[]
+  cajas       Caja[]
+  expedientes ImportExpediente[]
+  createdAt   DateTime           @default(now())
+}
+
+model Piloto {
+  id           String             @id @default(cuid())
+  empresaId    String
+  empresa      TransportEmpresa   @relation(fields: [empresaId], references: [id])
+  nombre       String
+  numLicencia  String
+  tipoLicencia String?
+  activo       Boolean            @default(true)
+  expedientes  ImportExpediente[]
+  createdAt    DateTime           @default(now())
+
+  @@index([empresaId])
+}
+
+model Cabezal {
+  id                 String             @id @default(cuid())
+  empresaId          String
+  empresa            TransportEmpresa   @relation(fields: [empresaId], references: [id])
+  placa              String             @unique
+  tarjetaCirculacion String?
+  marca              String?
+  modelo             String?
+  anio               Int?
+  activo             Boolean            @default(true)
+  expedientes        ImportExpediente[]
+  createdAt          DateTime           @default(now())
+
+  @@index([empresaId])
+}
+
+model Caja {
+  id                 String             @id @default(cuid())
+  empresaId          String
+  empresa            TransportEmpresa   @relation(fields: [empresaId], references: [id])
+  placa              String             @unique
+  numEconomico       String?
+  tarjetaCirculacion String?
+  tipo               String             @default("SECA")
+  activo             Boolean            @default(true)
+  expedientes        ImportExpediente[]
+  createdAt          DateTime           @default(now())
+
+  @@index([empresaId])
+}
+
+model SIGIEPermiso {
+  id                  String           @id @default(cuid())
+  expedienteId        String
+  expediente          ImportExpediente @relation(fields: [expedienteId], references: [id], onDelete: Cascade)
+  producto            String
+  nombreBotanico      String?
+  fraccionArancelaria String?
+  pesoNetoKG          Float
+  cantidadBultos      Int
+  tipoBulto           String
+  paisOrigen          String           @default("MÉXICO")
+  licenciaSanitaria   String?
+  temperatura         String?
+  numCertFitoMX       String?
+  numFactura          String?
+  numLote             String?
+  numCertInocuidad    String?
+  numCertCuarentena   String?
+  numAnalisisLab      String?
+  numCertCITES        String?
+  permisoFitoNumero   String?
+  permisoFitoUrl      String?
+  permisoFitoVigencia DateTime?
+  controlElectronico  String?
+  dictamenNumero      String?
+  dictamenUrl         String?
+  status              String           @default("PENDIENTE")
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([expedienteId])
 }
