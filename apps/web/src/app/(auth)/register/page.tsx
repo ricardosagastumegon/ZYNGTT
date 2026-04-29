@@ -27,7 +27,8 @@ export default function RegisterPage() {
     try {
       await registerUser(data);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error al registrar';
+      const axiosError = e as { response?: { data?: { error?: string } } };
+      const msg = axiosError?.response?.data?.error ?? (e instanceof Error ? e.message : 'Error al registrar');
       setError(msg);
     }
   };

@@ -6,22 +6,11 @@ import { useAuthStore } from '@/store/authStore';
 
 export default function RootPage() {
   const router = useRouter();
-  const user = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   useEffect(() => {
-    if (!user) {
-      router.replace('/login');
-      return;
-    }
-    switch (user.role) {
-      case 'EMPRESA':    router.replace('/dashboard/empresa'); break;
-      case 'TRANSPORTISTA': router.replace('/dashboard/transporte'); break;
-      case 'AGENTE':    router.replace('/dashboard/agente'); break;
-      case 'ADMIN':
-      case 'SUPERADMIN': router.replace('/dashboard/admin'); break;
-      default:           router.replace('/dashboard');
-    }
-  }, [user, router]);
+    router.replace(isAuthenticated ? '/dashboard' : '/login');
+  }, [isAuthenticated, router]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">

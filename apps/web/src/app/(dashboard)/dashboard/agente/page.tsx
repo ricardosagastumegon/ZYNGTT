@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { AlertCircle, Clock, CheckCircle2, Send } from 'lucide-react';
+import { AlertCircle, Clock, CheckCircle2, Send, RefreshCw } from 'lucide-react';
 
 interface AgentExpediente {
   id: string;
@@ -48,7 +48,7 @@ const STATUS_LABELS: Record<string, string> = {
 export default function AgenteDashboard() {
   const [transmitting, setTransmitting] = useState<string | null>(null);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['agent-expedientes'],
     queryFn: () => api.get('/api/import/list').then(r => r.data.data as AgentExpediente[]),
   });
@@ -118,7 +118,15 @@ export default function AgenteDashboard() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={5} className="text-center py-8 text-gray-400">Cargando...</td></tr>
+                <tr><td colSpan={5} className="text-center py-8 text-gray-400">Cargando expedientes...</td></tr>
+              ) : isError ? (
+                <tr><td colSpan={5} className="text-center py-8">
+                  <AlertCircle className="w-6 h-6 text-red-400 mx-auto mb-2" />
+                  <p className="text-gray-500 text-sm mb-2">Error al cargar expedientes</p>
+                  <button onClick={() => refetch()} className="inline-flex items-center gap-1 text-navy-700 text-sm hover:underline">
+                    <RefreshCw size={13} /> Reintentar
+                  </button>
+                </td></tr>
               ) : expedientes.length === 0 ? (
                 <tr><td colSpan={5} className="text-center py-8 text-gray-400">No hay expedientes asignados</td></tr>
               ) : expedientes.map((exp) => {

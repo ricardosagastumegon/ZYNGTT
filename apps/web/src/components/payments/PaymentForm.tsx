@@ -39,7 +39,7 @@ function CheckoutForm({ data, onSuccess }: { data: PaymentData; onSuccess: () =>
         <p className="text-sm text-gray-500">{data.shipment.reference} · {data.shipment.origin} → {data.shipment.destination}</p>
         <div className="border-t pt-3 space-y-1 text-sm">
           <div className="flex justify-between text-gray-500"><span>Flete</span><span>${data.payment.freightAmount.toFixed(2)}</span></div>
-          <div className="flex justify-between text-gray-500"><span>Comisión ZYN (5%)</span><span>${data.payment.commissionAmount.toFixed(2)}</span></div>
+          <div className="flex justify-between text-gray-500"><span>Comisión plataforma (5%)</span><span>${data.payment.commissionAmount.toFixed(2)}</span></div>
           <div className="flex justify-between font-bold text-gray-800 text-base mt-1 border-t pt-1"><span>Total</span><span>${data.payment.amount.toFixed(2)} {data.payment.currency}</span></div>
         </div>
       </div>
