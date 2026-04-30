@@ -1,8 +1,10 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { getMeRequest } from '@/lib/auth';
+import { useAuthStore } from '@/store/authStore';
 import { Logo } from '@/components/Logo';
 import {
   LayoutDashboard, ArrowDownToLine, ArrowUpFromLine, FileText,
@@ -155,8 +157,26 @@ function SidebarContent({ pathname, user, logout, onClose }: {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, logout } = useAuth();
+  const setUser = useAuthStore(s => s.setUser);
+  const token = useAuthStore(s => s.token);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    if (!token) { router.replace('/login'); return; }
+    if (user) { setHydrated(true); return; }
+    getMeRequest()
+      .then(u => { setUser(u); setHydrated(true); })
+      .catch(() => { router.replace('/login'); });
+  }, [token, user, setUser, router]);
+
+  if (!hydrated) return (
+    <div style={{ display: 'flex', height: '100vh', alignItems: 'center', justifyContent: 'center', background: 'var(--neutral-50)' }}>
+      <div style={{ width: 32, height: 32, border: '3px solid var(--brand-primary)', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+    </div>
+  );
 
   return (
     <div style={{ display: 'flex', height: '100vh', background: 'var(--neutral-50)' }}>

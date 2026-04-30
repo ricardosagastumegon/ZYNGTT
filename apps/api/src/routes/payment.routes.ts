@@ -19,8 +19,10 @@ paymentRoutes.post('/initiate/:shipmentId', asyncHandler(async (req, res) => {
 }));
 
 paymentRoutes.get('/history', asyncHandler(async (req, res) => {
-  const data = await paymentService.getPaymentHistory(req.user!.userId);
-  res.json({ success: true, data });
+  const page = Math.max(1, Number(req.query.page ?? 1));
+  const limit = Math.min(100, Math.max(1, Number(req.query.limit ?? 20)));
+  const data = await paymentService.getPaymentHistory(req.user!.userId, page, limit);
+  res.json({ success: true, ...data });
 }));
 
 paymentRoutes.get('/:shipmentId', asyncHandler(async (req, res) => {

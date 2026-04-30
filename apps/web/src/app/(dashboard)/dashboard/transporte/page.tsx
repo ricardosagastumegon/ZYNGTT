@@ -18,7 +18,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={18} /></button>
+        <button onClick={onClose} aria-label="Cerrar modal" className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"><X size={18} aria-hidden="true" /></button>
         <h3 className="font-semibold text-lg mb-4">{title}</h3>
         {children}
       </div>
@@ -26,20 +26,28 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   );
 }
 
-function Input({ label, name, value, onChange, type = 'text' }: any) {
+interface InputProps {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  type?: string;
+}
+function Input({ label, name, value, onChange, type = 'text' }: InputProps) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-      <input type={type} name={name} value={value} onChange={onChange}
+      <label htmlFor={name} className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      <input id={name} type={type} name={name} value={value} onChange={onChange}
         className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
     </div>
   );
 }
 
 const TABS = [
-  { id: 'pilotos',   label: 'Pilotos',   icon: User },
-  { id: 'cabezales', label: 'Cabezales', icon: Truck },
-  { id: 'cajas',     label: 'Cajas',     icon: Box },
+  { id: 'pilotos',      label: 'Pilotos',   icon: User },
+  { id: 'cabezales',    label: 'Cabezales', icon: Truck },
+  { id: 'cajas',        label: 'Cajas',     icon: Box },
+  { id: 'expedientes',  label: 'Envíos',    icon: CheckCircle2 },
 ];
 
 export default function TransporteDashboard() {
@@ -48,12 +56,14 @@ export default function TransporteDashboard() {
   const [showModal, setShowModal] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
 
+  const [selectedEmpresaId, setSelectedEmpresaId] = useState<string>('');
+
   const { data: empresas } = useQuery<TransportEmpresa[]>({
     queryKey: ['transport-empresas'],
     queryFn: () => api.get('/api/transport/empresas').then(r => r.data.data),
   });
 
-  const empresa = empresas?.[0];
+  const empresa = empresas?.find(e => e.id === selectedEmpresaId) ?? empresas?.[0];
 
   const { data: pilotos = [] } = useQuery<Piloto[]>({
     queryKey: ['pilotos', empresa?.id],
@@ -71,6 +81,12 @@ export default function TransporteDashboard() {
     queryKey: ['cajas', empresa?.id],
     queryFn: () => api.get(`/api/transport/empresas/${empresa!.id}/cajas`).then(r => r.data.data),
     enabled: !!empresa,
+  });
+
+  const { data: expedientes = [] } = useQuery<{ id: string; cfdiFolio: string; status: string; expNombre: string }[]>({
+    queryKey: ['t-expedientes', empresa?.id],
+    queryFn: () => api.get('/api/import?limit=50').then(r => r.data.data),
+    enabled: !!empresa && activeTab === 3,
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -104,6 +120,12 @@ export default function TransporteDashboard() {
         <div>
           <h1 className="text-2xl font-semibold" style={{ fontFamily: 'var(--font-display)' }}>Panel Transportista</h1>
           <p className="text-sm text-gray-500 mt-1">{empresa.nombre} · CAAT: {empresa.CAAT}</p>
+          {empresas && empresas.length > 1 && (
+            <select value={selectedEmpresaId} onChange={e => setSelectedEmpresaId(e.target.value)}
+              className="mt-2 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none">
+              {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+            </select>
+          )}
         </div>
         <button onClick={() => { setShowModal(TABS[activeTab].id); setForm({}); }}
           className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-medium"
@@ -207,6 +229,33 @@ export default function TransporteDashboard() {
                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.tipo === 'REFRIGERADA' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>{c.tipo}</span>
                   </td>
                   <td className="px-4 py-3"><span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Activa</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {/* Envíos */}
+        {activeTab === 3 && (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50"><tr>
+              {['Referencia / Folio', 'Exportador', 'Status', ''].map(h => (
+                <th key={h} className="text-left px-4 py-3 text-xs font-medium text-gray-400 uppercase tracking-wide">{h}</th>
+              ))}
+            </tr></thead>
+            <tbody className="divide-y divide-gray-50">
+              {expedientes.length === 0 ? (
+                <tr><td colSpan={4} className="text-center py-8 text-gray-400 text-sm">Sin envíos asignados</td></tr>
+              ) : expedientes.map((exp) => (
+                <tr key={exp.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-mono text-xs text-gray-700">{exp.cfdiFolio || exp.id.slice(0, 8)}</td>
+                  <td className="px-4 py-3 text-gray-700">{exp.expNombre}</td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-medium">{exp.status}</span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <a href={`/import/${exp.id}`} className="text-xs text-indigo-600 hover:underline">Ver</a>
+                  </td>
                 </tr>
               ))}
             </tbody>

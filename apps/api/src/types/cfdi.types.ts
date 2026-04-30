@@ -48,6 +48,7 @@ export interface CFDIComercioExterior {
 
 export interface CFDIData {
   version: string;
+  uuid?: string;
   folio?: string;
   serie?: string;
   fecha: string;

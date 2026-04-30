@@ -104,7 +104,7 @@ export const importExpedienteService = {
       data: {
         shipmentId: shipment.id,
         userId,
-        cfdiUUID: cfdi.folio,
+        cfdiUUID: cfdi.uuid,
         cfdiFolio: cfdi.folio ?? '',
         expNombre: cfdi.emisor.nombre,
         expRFC: cfdi.emisor.rfc,
@@ -157,7 +157,6 @@ export const importExpedienteService = {
       data: {
         ...data,
         fechaCruce: data.fechaCruce ? new Date(data.fechaCruce) : undefined,
-        status: 'DOCS_GENERADOS',
       },
     });
   },
@@ -174,7 +173,9 @@ export const importExpedienteService = {
       },
     });
     if (!exp) throw new AppError('Expediente no encontrado', 404);
-    if (!exp.pilotoId) throw new AppError('Datos de transporte incompletos — llena el Paso 2 primero', 400);
+    if (!exp.pilotoId || !exp.cabezalId || !exp.cajaId) {
+      throw new AppError('Datos de transporte incompletos — se requiere piloto, cabezal y caja para generar documentos', 400);
+    }
 
     const folder = `axon/expedientes/${id}`;
     const mercancias = exp.mercancias as { fraccion: string; cantidadKG: number; valorUSD?: number; nombre?: string; cantidadBultos?: number; tipoBulto?: string }[];
@@ -320,7 +321,7 @@ export const importExpedienteService = {
   },
 
   async list(userId: string, role: string, page = 1, limit = 20) {
-    const where = ['AGENTE', 'ADMIN', 'SUPERADMIN'].includes(role) ? {} : { userId };
+    const where = (role === 'ADMIN' || role === 'SUPERADMIN') ? {} : { userId };
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       prisma.importExpediente.findMany({

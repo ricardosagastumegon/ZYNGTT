@@ -37,6 +37,8 @@ export function parseCFDI(xmlString: string): CFDIData {
   const version = getAttr(comprobante, 'Version') || getAttr(comprobante, 'version') || '4.0';
   const folio = getAttr(comprobante, 'Folio');
   const serie = getAttr(comprobante, 'Serie');
+  const timbreEl = findElement(doc, 'tfd:TimbreFiscalDigital', 'TimbreFiscalDigital');
+  const uuid = timbreEl ? (getAttr(timbreEl as Element, 'UUID') || undefined) : undefined;
   const fecha = getAttr(comprobante, 'Fecha');
   const subTotal = getAttrFloat(comprobante, 'SubTotal');
   const total = getAttrFloat(comprobante, 'Total');
@@ -110,7 +112,7 @@ export function parseCFDI(xmlString: string): CFDIData {
   const totalUSD = moneda === 'USD' ? total : total / (tipoCambio || 17.5);
 
   return {
-    version, folio, serie, fecha, subTotal, total, moneda, tipoCambio,
+    version, uuid, folio, serie, fecha, subTotal, total, moneda, tipoCambio,
     tipoDeComprobante, emisor, receptor, conceptos, comercioExterior,
     hsCodeDetected, totalUSD,
   };

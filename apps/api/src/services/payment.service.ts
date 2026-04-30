@@ -28,12 +28,19 @@ export const paymentService = {
     return { payment, clientSecret: intent.client_secret };
   },
 
-  async getPaymentHistory(userId: string) {
-    return prisma.payment.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      include: { shipment: { select: { reference: true, origin: true, destination: true } } },
-    });
+  async getPaymentHistory(userId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+      prisma.payment.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: { shipment: { select: { reference: true, origin: true, destination: true } } },
+      }),
+      prisma.payment.count({ where: { userId } }),
+    ]);
+    return { data, total, page, limit };
   },
 
   async getByShipment(shipmentId: string, userId: string) {

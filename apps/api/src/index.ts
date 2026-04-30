@@ -21,6 +21,7 @@ import automationRoutes from './routes/automation.routes';
 import { adminRoutes } from './routes/admin.routes';
 import { transportCatalogRoutes } from './routes/transport-catalog.routes';
 import { startStatusPoller } from './jobs/status-poller';
+import { generalLimiter } from './middleware/rateLimiter';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -36,12 +37,13 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
       cb(null, true);
     } else {
-      cb(null, true); // permissive during initial deployment
+      cb(new Error(`Origin ${origin} not allowed by CORS`), false);
     }
   },
   credentials: true,
 }));
 app.use(morgan('dev'));
+app.use(generalLimiter);
 
 // Raw body for Stripe webhooks
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));

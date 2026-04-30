@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { trackingService } from '../services/tracking.service';
 import { authenticate } from '../middleware/auth';
 import { asyncHandler } from '../middleware/asyncHandler';
@@ -30,8 +31,14 @@ trackingRoutes.post('/sync/:shipmentId', asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 }));
 
+const manualEventSchema = z.object({
+  status: z.string().min(1),
+  description: z.string().min(1),
+  location: z.string().optional(),
+});
+
 trackingRoutes.post('/manual/:shipmentId', asyncHandler(async (req, res) => {
-  const { status, description, location } = req.body;
+  const { status, description, location } = manualEventSchema.parse(req.body);
   const event = await trackingService.addManualEvent(req.params.shipmentId, status, description, location);
   res.status(201).json({ success: true, data: event });
 }));

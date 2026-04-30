@@ -96,16 +96,16 @@ const ADUANAS_GT = ['ADUANA TECUN UMAN II', 'ADUANA TECUN UMAN I', 'ADUANA EL CA
 const TIPOS_BULTO = ['CAJA', 'SACO', 'ARPILLA', 'PALLET', 'BULTO', 'CARTÓN'];
 
 // ─── Helpers ─────────────────────────────────────────────
-function FL({ children }: { children: React.ReactNode }) {
-  return <label className="block text-xs font-medium text-gray-500 mb-1">{children}</label>;
+function FL({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
+  return <label htmlFor={htmlFor} className="block text-xs font-medium text-gray-500 mb-1">{children}</label>;
 }
-function TI({ value, onChange, placeholder, type = 'text', disabled, readOnly }: {
-  value: string; onChange?: (v: string) => void; placeholder?: string;
+function TI({ id, value, onChange, placeholder, type = 'text', disabled, readOnly }: {
+  id?: string; value: string; onChange?: (v: string) => void; placeholder?: string;
   type?: string; disabled?: boolean; readOnly?: boolean;
 }) {
   return (
     <input
-      type={type} value={value} placeholder={placeholder}
+      id={id} type={type} value={value} placeholder={placeholder}
       readOnly={readOnly} disabled={disabled}
       onChange={e => onChange?.(e.target.value)}
       className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:bg-gray-50 read-only:bg-gray-50 read-only:text-gray-500"

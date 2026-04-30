@@ -43,6 +43,6 @@ export const useAuthStore = create<AuthState>()(
       },
       setUser: (user) => set({ user }),
     }),
-    { name: 'zyn_auth', partialize: (s) => ({ token: s.token, refreshToken: s.refreshToken }) }
+    { name: 'zyn_auth', partialize: (s) => ({ user: s.user, token: s.token, refreshToken: s.refreshToken }) }
   )
 );

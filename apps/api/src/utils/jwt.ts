@@ -2,8 +2,9 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 
 const JWT_SECRET = process.env.JWT_SECRET!;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
-const REFRESH_SECRET = process.env.REFRESH_TOKEN_SECRET || JWT_SECRET + '_refresh';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
+const REFRESH_SECRET = process.env.REFRESH_TOKEN_SECRET!;
+if (!REFRESH_SECRET) throw new Error('REFRESH_TOKEN_SECRET env var is required');
 
 export interface JwtPayload {
   userId: string;

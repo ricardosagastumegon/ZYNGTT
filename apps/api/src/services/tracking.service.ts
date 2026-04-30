@@ -7,7 +7,7 @@ export const trackingService = {
   async getEvents(shipmentId: string, userId: string) {
     const shipment = await prisma.shipment.findFirst({ where: { id: shipmentId, userId } });
     if (!shipment) throw new AppError('Shipment not found', 404);
-    return prisma.trackingEvent.findMany({ where: { shipmentId }, orderBy: { occurredAt: 'desc' } });
+    return prisma.trackingEvent.findMany({ where: { shipmentId }, orderBy: { occurredAt: 'desc' }, take: 100 });
   },
 
   async trackByNumber(trackingNumber: string) {
