@@ -49,6 +49,7 @@ router.get('/sigie/:id', asyncHandler(async (req, res) => {
         select: {
           id: true,
           producto: true,
+          fraccionArancelaria: true,
           status: true,
           permisoFitoNumero: true,
           dictamenNumero: true,

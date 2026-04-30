@@ -188,14 +188,50 @@ export const importExpedienteService = {
     });
   },
 
-  async uploadFitoMX(id: string, buffer: Buffer, filename: string, userId: string) {
+  async uploadFitoMX(id: string, buffer: Buffer, filename: string, userId: string, fitoMXNumero?: string, fitoMXFecha?: string) {
     const exp = await prisma.importExpediente.findFirst({ where: { id, userId } });
     if (!exp) throw new AppError('Expediente no encontrado', 404);
 
     const upload = await uploadBuffer(buffer, `axon/expedientes/${id}/fito-mx`, 'raw');
     return prisma.importExpediente.update({
       where: { id },
-      data: { fitoMXUrl: upload.secure_url },
+      data: {
+        fitoMXUrl: upload.secure_url,
+        fitoMXNumero: fitoMXNumero || undefined,
+        fitoMXFecha: fitoMXFecha ? new Date(fitoMXFecha) : undefined,
+      },
+    });
+  },
+
+  async upsertSIGIEPermiso(expedienteId: string, data: Record<string, unknown>, userId: string) {
+    const exp = await prisma.importExpediente.findFirst({ where: { id: expedienteId, userId } });
+    if (!exp) throw new AppError('Expediente no encontrado', 404);
+
+    const fraccion = data.fraccionArancelaria as string;
+    const existing = await prisma.sIGIEPermiso.findFirst({
+      where: { expedienteId, fraccionArancelaria: fraccion },
+    });
+
+    const payload = {
+      producto: data.producto as string,
+      pesoNetoKG: Number(data.pesoNetoKG),
+      cantidadBultos: Number(data.cantidadBultos) || 1,
+      tipoBulto: (data.tipoBulto as string) || 'CAJA',
+      licenciaSanitaria: (data.licenciaSanitaria as string) || undefined,
+      temperatura: (data.temperatura as string) || undefined,
+      numCertFitoMX: (data.numCertFitoMX as string) || undefined,
+      numFactura: (data.numFactura as string) || undefined,
+      numLote: (data.numLote as string) || undefined,
+      numCertInocuidad: (data.numCertInocuidad as string) || undefined,
+      numAnalisisLab: (data.numAnalisisLab as string) || undefined,
+      status: 'PENDIENTE',
+    };
+
+    if (existing) {
+      return prisma.sIGIEPermiso.update({ where: { id: existing.id }, data: payload });
+    }
+    return prisma.sIGIEPermiso.create({
+      data: { expedienteId, fraccionArancelaria: fraccion, paisOrigen: 'MÉXICO', ...payload },
     });
   },
 

@@ -52,8 +52,16 @@ router.post('/generate-docs/:id', asyncHandler(async (req, res) => {
 router.post('/fito-mx/:id', upload.single('fito'), asyncHandler(async (req, res) => {
   if (!req.file) throw new Error('Archivo requerido');
   const result = await importExpedienteService.uploadFitoMX(
-    req.params.id, req.file.buffer, req.file.originalname, req.user!.userId
+    req.params.id, req.file.buffer, req.file.originalname, req.user!.userId,
+    req.body.fitoMXNumero as string | undefined,
+    req.body.fitoMXFecha as string | undefined,
   );
+  res.json({ success: true, data: result });
+}));
+
+// POST /api/import/sigie-permiso/:id — Upsert SIGIEPermiso with form data
+router.post('/sigie-permiso/:id', asyncHandler(async (req, res) => {
+  const result = await importExpedienteService.upsertSIGIEPermiso(req.params.id, req.body, req.user!.userId);
   res.json({ success: true, data: result });
 }));
 
