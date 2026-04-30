@@ -33,6 +33,7 @@ function generateReference(): string {
 
 export const importExpedienteService = {
   async parseCFDIAndCreate(xmlBuffer: Buffer, userId: string) {
+    try {
     const cfdi = parseCFDI(xmlBuffer.toString('utf-8'));
 
     // Build lookup: NoIdentificacion → Concepto description (fallback when CE has no DescripcionIngles)
@@ -146,6 +147,11 @@ export const importExpedienteService = {
     }
 
     return { ...expediente, shipment: { id: shipment.id, reference: shipment.reference } };
+    } catch (error) {
+      console.error('ERROR EN PARSE CFDI:', (error as Error).message);
+      console.error('STACK:', (error as Error).stack);
+      throw error;
+    }
   },
 
   async addTransportData(id: string, data: TransportData, userId: string) {
