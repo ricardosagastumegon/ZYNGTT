@@ -25,7 +25,7 @@ export async function getChecklist(expedienteId: string): Promise<ChecklistResul
   const labOk = !exp.labRequerido || !!exp.labResultado;
 
   const stage1: ChecklistItem[] = [
-    { stage: 1, item: 'CFDI subido',           ok: !!exp.cfdiXmlUrl },
+    { stage: 1, item: 'CFDI subido',           ok: !!(exp.cfdiXmlUrl || exp.cfdiUUID || exp.cfdiFolio || exp.expRFC) },
     { stage: 1, item: 'Fito México subido',     ok: !!exp.fitoMXNumero },
     { stage: 1, item: 'Datos de transporte',    ok: !!(exp.pilotoId && exp.cabezalId) },
     { stage: 1, item: 'Lab (si aplica)',        ok: labOk },

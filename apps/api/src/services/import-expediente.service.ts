@@ -57,6 +57,16 @@ export const importExpedienteService = {
     const tributos = calcularTributos(mercancias, 350, incoterm, cfdi.tipoCambio ?? 7.75);
     const labReq = mercancias.some(m => getHSInfo(m.fraccion)?.requiereLabMX);
 
+    // Resolve impNIT: prefer CE Receptor NumRegIdTrib, fallback to user's company taxId
+    let impNIT: string | undefined = cfdi.comercioExterior?.numRegIdTrib || undefined;
+    if (!impNIT) {
+      const userRecord = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { company: { select: { taxId: true } } },
+      });
+      impNIT = userRecord?.company?.taxId ?? undefined;
+    }
+
     // Auto-create a draft Shipment from CFDI data — user never needs to enter an ID
     let reference = generateReference();
     let attempts = 0;
@@ -91,6 +101,7 @@ export const importExpedienteService = {
         expRFC: cfdi.emisor.rfc,
         impNombre: cfdi.receptor.nombre,
         impIdFiscal: cfdi.receptor.rfc,
+        impNIT,
         incoterm,
         moneda: cfdi.moneda ?? 'USD',
         tipoCambio: cfdi.tipoCambio,
@@ -105,6 +116,25 @@ export const importExpedienteService = {
         status: 'CFDI_PENDIENTE',
       },
     });
+
+    // Create one SIGIEPermiso per product so checklist stage 2 is populated immediately
+    if (mercancias.length > 0) {
+      await Promise.all(mercancias.map(m => {
+        const hsInfo = getHSInfo(m.fraccion);
+        return prisma.sIGIEPermiso.create({
+          data: {
+            expedienteId: expediente.id,
+            producto: m.nombre ?? m.fraccion,
+            fraccionArancelaria: m.fraccion,
+            pesoNetoKG: m.cantidadKG,
+            cantidadBultos: 0,
+            tipoBulto: 'UNIDAD',
+            status: 'PENDIENTE',
+            ...(hsInfo?.nombreBotanico ? { nombreBotanico: hsInfo.nombreBotanico } : {}),
+          },
+        });
+      }));
+    }
 
     return { ...expediente, shipment: { id: shipment.id, reference: shipment.reference } };
   },

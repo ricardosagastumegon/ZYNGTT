@@ -41,6 +41,7 @@ export interface CFDIComercioExterior {
   subdivisicion?: boolean;
   tipoCambioUSD?: number;
   totalUSD?: number;
+  numRegIdTrib?: string;
   mercancias: CFDIMercancia[];
 }
 

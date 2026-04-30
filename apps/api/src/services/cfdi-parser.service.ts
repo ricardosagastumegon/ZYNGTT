@@ -87,12 +87,16 @@ export function parseCFDI(xmlString: string): CFDIData {
       valorDolares: getAttrFloat(m, 'ValorDolares') || undefined,
       kilogramosNetos: getAttrFloat(m, 'KilogramosNetos') || undefined,
     }));
+    // NumRegIdTrib lives inside cce20:Receptor, a child of ComercioExterior
+    const ceReceptorEl = findAll(ceEl as unknown as Document, 'Receptor')[0];
+    const numRegIdTrib = getAttr(ceReceptorEl, 'NumRegIdTrib') || undefined;
     comercioExterior = {
       version: getAttr(ceEl, 'Version'),
       tipoOperacion: getAttr(ceEl, 'TipoOperacion'),
       claveDePedimento: getAttr(ceEl, 'ClaveDePedimento'),
       tipoCambioUSD: getAttrFloat(ceEl, 'TipoCambioUSD') || undefined,
       totalUSD: getAttrFloat(ceEl, 'TotalUSD') || undefined,
+      numRegIdTrib,
       mercancias,
     };
   }
