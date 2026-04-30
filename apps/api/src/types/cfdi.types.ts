@@ -23,6 +23,7 @@ export interface CFDIConcepto {
 }
 
 export interface CFDIMercancia {
+  noIdentificacion?: string;
   fraccionArancelaria?: string;
   paisOrigenDestino?: string;
   descripcionIngles?: string;

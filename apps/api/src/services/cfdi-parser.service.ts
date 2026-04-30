@@ -79,6 +79,7 @@ export function parseCFDI(xmlString: string): CFDIData {
   if (ceEl) {
     const mercanciaEls = findAll(ceEl as unknown as Document, 'Mercancia');
     const mercancias: CFDIMercancia[] = mercanciaEls.map(m => ({
+      noIdentificacion: getAttr(m, 'NoIdentificacion') || undefined,
       fraccionArancelaria: getAttr(m, 'FraccionArancelaria') || undefined,
       paisOrigenDestino: getAttr(m, 'PaisOrigenDestino') || undefined,
       descripcionIngles: getAttr(m, 'DescripcionIngles') || undefined,

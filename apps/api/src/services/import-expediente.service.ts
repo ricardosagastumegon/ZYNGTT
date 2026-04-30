@@ -35,11 +35,20 @@ export const importExpedienteService = {
   async parseCFDIAndCreate(xmlBuffer: Buffer, userId: string) {
     const cfdi = parseCFDI(xmlBuffer.toString('utf-8'));
 
-    const mercancias: Mercancia[] = (cfdi.comercioExterior?.mercancias ?? []).map(m => ({
+    // Build lookup: NoIdentificacion → Concepto description (fallback when CE has no DescripcionIngles)
+    const conceptoByNoId: Record<string, string> = {};
+    for (const c of cfdi.conceptos) {
+      if (c.noIdentificacion) conceptoByNoId[c.noIdentificacion] = c.descripcion;
+    }
+
+    const mercancias: Mercancia[] = (cfdi.comercioExterior?.mercancias ?? []).map((m, idx) => ({
       fraccion: m.fraccionArancelaria ?? '',
       cantidadKG: m.kilogramosNetos ?? m.cantidadAduana ?? 0,
       valorUSD: m.valorDolares ?? 0,
-      nombre: m.descripcionIngles,
+      nombre: m.descripcionIngles
+        ?? (m.noIdentificacion ? conceptoByNoId[m.noIdentificacion] : undefined)
+        ?? cfdi.conceptos[idx]?.descripcion
+        ?? undefined,
     }));
 
     if (mercancias.length === 0 && cfdi.conceptos.length > 0) {

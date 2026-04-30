@@ -92,7 +92,6 @@ const STEPS = [
   { n: 6, label: 'Confirmar',  icon: CheckCircle2 },
 ] as const;
 
-const ADUANAS_MX = ['ADUANA SUCHIATE II', 'ADUANA SUCHIATE I', 'ADUANA CIUDAD HIDALGO'];
 const ADUANAS_GT = ['ADUANA TECUN UMAN II', 'ADUANA TECUN UMAN I', 'ADUANA EL CARMEN'];
 const TIPOS_BULTO = ['CAJA', 'SACO', 'ARPILLA', 'PALLET', 'BULTO', 'CARTÓN'];
 
@@ -552,13 +551,7 @@ export default function NewImportPage() {
           {/* Aduanas */}
           <div className="space-y-3">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Cruce Fronterizo</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FL>Aduana Salida MX</FL>
-                <SI value={transport.aduanaSalidaMX} onChange={setT('aduanaSalidaMX')}>
-                  {ADUANAS_MX.map(a => <option key={a}>{a}</option>)}
-                </SI>
-              </div>
+            <div className="grid grid-cols-3 gap-4">
               <div>
                 <FL>Aduana Entrada GT</FL>
                 <SI value={transport.aduanaEntradaGT} onChange={setT('aduanaEntradaGT')}>
