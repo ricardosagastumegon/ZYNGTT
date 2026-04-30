@@ -10,7 +10,8 @@ function getAttrFloat(node: Element | null, attr: string): number {
 
 function findElement(doc: Document, ...tags: string[]): Element | null {
   for (const tag of tags) {
-    const el = doc.querySelector(tag) ?? doc.getElementsByTagNameNS('*', tag.split(':').pop() ?? tag)[0];
+    const local = tag.split(':').pop() ?? tag;
+    const el = doc.getElementsByTagNameNS('*', local)[0];
     if (el) return el as Element;
   }
   return null;
