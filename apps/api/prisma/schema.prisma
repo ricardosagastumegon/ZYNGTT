@@ -384,13 +384,13 @@ model ImportExpediente {
 
   // Transporte (catálogos)
   transporteEmpresaId String?
-  transporteEmpresa   TransportEmpresa? @relation(fields: [transporteEmpresaId], references: [id])
+  transporteEmpresa   TransportEmpresa? @relation(fields: [transporteEmpresaId], references: [id], onDelete: SetNull)
   pilotoId            String?
-  piloto              Piloto?           @relation(fields: [pilotoId], references: [id])
+  piloto              Piloto?           @relation(fields: [pilotoId], references: [id], onDelete: SetNull)
   cabezalId           String?
-  cabezal             Cabezal?          @relation(fields: [cabezalId], references: [id])
+  cabezal             Cabezal?          @relation(fields: [cabezalId], references: [id], onDelete: SetNull)
   cajaId              String?
-  caja                Caja?             @relation(fields: [cajaId], references: [id])
+  caja                Caja?             @relation(fields: [cajaId], references: [id], onDelete: SetNull)
   fleteCosto          Float?
 
   // Origen / Destino
@@ -429,8 +429,6 @@ model ImportExpediente {
   labUrl            String?
 
   // SIGIE/MAGA
-  sigieCredUser     String?
-  sigieCredPass     String?
   sigiePermisos     SIGIEPermiso[]
   sigieStatus       String            @default("PENDIENTE")
   sigieAprobadoAt   DateTime?
@@ -502,7 +500,7 @@ model TransportEmpresa {
 model Piloto {
   id           String             @id @default(cuid())
   empresaId    String
-  empresa      TransportEmpresa   @relation(fields: [empresaId], references: [id])
+  empresa      TransportEmpresa   @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   nombre       String
   numLicencia  String
   tipoLicencia String?
@@ -516,7 +514,7 @@ model Piloto {
 model Cabezal {
   id                 String             @id @default(cuid())
   empresaId          String
-  empresa            TransportEmpresa   @relation(fields: [empresaId], references: [id])
+  empresa            TransportEmpresa   @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   placa              String             @unique
   tarjetaCirculacion String?
   marca              String?
@@ -532,7 +530,7 @@ model Cabezal {
 model Caja {
   id                 String             @id @default(cuid())
   empresaId          String
-  empresa            TransportEmpresa   @relation(fields: [empresaId], references: [id])
+  empresa            TransportEmpresa   @relation(fields: [empresaId], references: [id], onDelete: Restrict)
   placa              String             @unique
   numEconomico       String?
   tarjetaCirculacion String?
