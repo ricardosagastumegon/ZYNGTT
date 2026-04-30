@@ -11,6 +11,7 @@ interface AuthState {
   login: (user: User, token: string, refreshToken: string) => void;
   logout: () => void;
   setUser: (user: User) => void;
+  rehydrate: () => Promise<boolean>;
 }
 
 function setCookie(name: string, value: string, days: number) {
@@ -24,7 +25,7 @@ function deleteCookie(name: string) {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       token: null,
       refreshToken: null,
@@ -42,7 +43,35 @@ export const useAuthStore = create<AuthState>()(
         set({ user: null, token: null, refreshToken: null, isAuthenticated: false });
       },
       setUser: (user) => set({ user }),
+      rehydrate: async () => {
+        const token = get().token;
+        if (!token) return false;
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+          const res = await fetch(`${apiUrl}/api/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) {
+            get().logout();
+            return false;
+          }
+          const data = await res.json();
+          set({ user: data.data, isAuthenticated: true });
+          return true;
+        } catch {
+          get().logout();
+          return false;
+        }
+      },
     }),
-    { name: 'zyn_auth', partialize: (s) => ({ user: s.user, token: s.token, refreshToken: s.refreshToken }) }
+    {
+      name: 'axon-auth',
+      partialize: (s) => ({
+        user: s.user,
+        token: s.token,
+        refreshToken: s.refreshToken,
+        isAuthenticated: s.isAuthenticated,
+      }),
+    }
   )
 );
