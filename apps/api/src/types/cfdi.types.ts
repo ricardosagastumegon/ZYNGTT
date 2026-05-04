@@ -3,6 +3,7 @@ export interface CFDIEmisor {
   rfc: string;
   regimenFiscal: string;
   domicilio?: string;
+  curp?: string;
 }
 
 export interface CFDIReceptor {

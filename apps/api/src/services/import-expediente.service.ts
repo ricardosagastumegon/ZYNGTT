@@ -67,15 +67,15 @@ export const importExpedienteService = {
     const tributos = calcularTributos(mercancias, 350, incoterm, cfdi.tipoCambio ?? 7.75);
     const labReq = mercancias.some(m => getHSInfo(m.fraccion)?.requiereLabMX);
 
-    // Resolve impNIT: prefer CE Receptor NumRegIdTrib, fallback to user's company taxId
-    let impNIT: string | undefined = cfdi.comercioExterior?.numRegIdTrib || undefined;
-    if (!impNIT) {
-      const userRecord = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { company: { select: { taxId: true } } },
-      });
-      impNIT = userRecord?.company?.taxId ?? undefined;
-    }
+    // Resolve importer data: prefer company profile, fallback to CFDI receptor
+    const userRecord = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { company: { select: { name: true, taxId: true, address: true } } },
+    });
+    const company = userRecord?.company;
+    const impNIT: string | undefined = cfdi.comercioExterior?.numRegIdTrib || company?.taxId || undefined;
+    const impNombre = company?.name || cfdi.receptor.nombre;
+    const impDireccion = company?.address || undefined;
 
     // Auto-create a draft Shipment from CFDI data — user never needs to enter an ID
     let reference = generateReference();
@@ -106,12 +106,15 @@ export const importExpedienteService = {
         shipmentId: shipment.id,
         userId,
         cfdiUUID: cfdi.uuid,
-        cfdiFolio: cfdi.folio ?? '',
+        cfdiFolio: `${cfdi.serie ?? ''}${cfdi.folio ?? ''}`,
         expNombre: cfdi.emisor.nombre,
         expRFC: cfdi.emisor.rfc,
-        impNombre: cfdi.receptor.nombre,
+        expDireccion: cfdi.emisor.domicilio ?? undefined,
+        expCURP: cfdi.emisor.curp ?? undefined,
+        impNombre,
         impIdFiscal: cfdi.receptor.rfc,
         impNIT,
+        impDireccion,
         incoterm,
         moneda: cfdi.moneda ?? 'USD',
         tipoCambio: cfdi.tipoCambio,
@@ -195,6 +198,9 @@ export const importExpedienteService = {
       impNIT: exp.impNIT ?? undefined,
       impDireccion: exp.impDireccion ?? undefined,
       // Map catalog relations to string fields expected by PDF generator
+      expDireccion: exp.expDireccion ?? undefined,
+      expCURP: exp.expCURP ?? undefined,
+      cfdiFolio: exp.cfdiFolio ?? undefined,
       pilotoNombre: exp.piloto?.nombre ?? undefined,
       pilotoLicencia: exp.piloto?.numLicencia ?? undefined,
       cabezalPlaca: exp.cabezal?.placa ?? undefined,

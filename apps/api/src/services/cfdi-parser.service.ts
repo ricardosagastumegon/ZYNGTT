@@ -78,7 +78,7 @@ export function parseCFDI(xmlString: string): CFDIData {
 
   // Complemento ComercioExterior
   let comercioExterior: CFDIComercioExterior | undefined;
-  const ceEl = findAll(doc, 'ComercioExterior')[0];
+  const ceEl = findAll(doc, 'ComercioExterior')[0] ?? null;
   if (ceEl) {
     const mercanciaEls = findAll(ceEl as unknown as Document, 'Mercancia');
     const mercancias: CFDIMercancia[] = mercanciaEls.map(m => ({
@@ -92,8 +92,29 @@ export function parseCFDI(xmlString: string): CFDIData {
       kilogramosNetos: getAttrFloat(m, 'KilogramosNetos') || undefined,
     }));
     // NumRegIdTrib lives inside cce20:Receptor, a child of ComercioExterior
-    const ceReceptorEl = findAll(ceEl as unknown as Document, 'Receptor')[0];
+    const ceReceptorEl = findAll(ceEl as unknown as Document, 'Receptor')[0] ?? null;
     const numRegIdTrib = getAttr(ceReceptorEl, 'NumRegIdTrib') || undefined;
+
+    // Emisor domicilio from ComercioExterior complement
+    const ceEmisorEl = findAll(ceEl as unknown as Document, 'Emisor')[0] ?? null;
+    if (ceEmisorEl) {
+      const curp = getAttr(ceEmisorEl, 'CurpEmisora');
+      if (curp) emisor.curp = curp;
+      const domEl = findAll(ceEmisorEl as unknown as Document, 'Domicilio')[0] ?? null;
+      if (domEl) {
+        const parts = [
+          getAttr(domEl, 'Calle'),
+          getAttr(domEl, 'NumeroExterior'),
+          getAttr(domEl, 'Colonia'),
+          getAttr(domEl, 'Municipio') || getAttr(domEl, 'Localidad'),
+          getAttr(domEl, 'Estado'),
+          'México',
+          `CP ${getAttr(domEl, 'CodigoPostal')}`,
+        ].filter(Boolean);
+        emisor.domicilio = parts.join(', ');
+      }
+    }
+
     comercioExterior = {
       version: getAttr(ceEl, 'Version'),
       tipoOperacion: getAttr(ceEl, 'TipoOperacion'),

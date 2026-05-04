@@ -14,6 +14,7 @@ export const userRoutes = Router();
 
 userRoutes.use(authenticate);
 userRoutes.get('/me', asyncHandler(userController.me));
+userRoutes.put('/me', asyncHandler(userController.updateProfile));
 userRoutes.put('/profile', asyncHandler(userController.updateProfile));
 
 // ── List users ─────────────────────────────────────────────────────────────

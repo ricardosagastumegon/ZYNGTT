@@ -6,7 +6,8 @@ export interface User {
   firstName: string;
   lastName: string;
   role: string;
-  company?: { id: string; name: string } | null;
+  phone?: string | null;
+  company?: { id: string; name: string; taxId?: string | null; address?: string | null; phone?: string | null } | null;
 }
 
 export async function loginRequest(email: string, password: string) {

@@ -31,7 +31,7 @@ export const userModel = {
       include: { company: true },
     }),
 
-  update: (id: string, data: Partial<Pick<User, 'firstName' | 'lastName'>>) =>
+  update: (id: string, data: Partial<Pick<User, 'firstName' | 'lastName' | 'phone'>>) =>
     prisma.user.update({ where: { id }, data }),
 
   saveRefreshToken: (userId: string, token: string, expiresAt: Date) =>
