@@ -360,37 +360,16 @@ export default function IntegracionesPage() {
             </div>
           </IntegrationCard>
 
-          {/* Cloudinary */}
+          {/* Supabase Storage */}
           <IntegrationCard
-            icon={Cloud} title="Cloudinary (Documentos)"
-            subtitle="api.cloudinary.com"
+            icon={Cloud} title="Supabase Storage (Documentos)"
+            subtitle="supabase.co/storage"
             configured={data.cloudinary.configured}
             status={data.cloudinary.ok}
           >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <span>Documentos subidos</span>
-                <span className="font-medium text-gray-700">{data.cloudinary.documentCount}</span>
-              </div>
-              {data.cloudinary.storageMB !== null && (
-                <>
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Almacenamiento usado</span>
-                    <span className="font-medium text-gray-700">
-                      {data.cloudinary.storageMB} MB
-                      {data.cloudinary.storageLimitMB ? ` / ${data.cloudinary.storageLimitMB} MB` : ''}
-                    </span>
-                  </div>
-                  {data.cloudinary.storageLimitMB && (
-                    <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-indigo-500 transition-all"
-                        style={{ width: `${Math.min(100, (data.cloudinary.storageMB / data.cloudinary.storageLimitMB) * 100)}%` }}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>Documentos subidos</span>
+              <span className="font-medium text-gray-700">{data.cloudinary.documentCount}</span>
             </div>
           </IntegrationCard>
 

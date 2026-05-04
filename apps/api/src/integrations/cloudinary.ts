@@ -1,41 +1,57 @@
-import { v2 as cloudinary } from 'cloudinary';
+// Supabase Storage — reemplaza Cloudinary manteniendo las mismas firmas exportadas
+const SUPABASE_URL = process.env.SUPABASE_URL ?? '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
+const BUCKET = 'axon-docs';
 
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-export async function uploadDocument(buffer: Buffer, filename: string, shipmentId: string): Promise<{ url: string; publicId: string }> {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { folder: `zyn/shipments/${shipmentId}`, public_id: filename, resource_type: 'auto' },
-      (error, result) => {
-        if (error || !result) return reject(error ?? new Error('Upload failed'));
-        resolve({ url: result.secure_url, publicId: result.public_id });
-      }
-    );
-    stream.end(buffer);
+export async function uploadBuffer(
+  buffer: Buffer,
+  path: string,
+  _resourceType?: string,
+): Promise<{ secure_url: string; public_id: string }> {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
+    throw new Error('SUPABASE_URL y SUPABASE_SERVICE_KEY son requeridos para subir documentos');
+  }
+  const cleanPath = path.replace(/^\/+/, '');
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${cleanPath}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      apikey: SUPABASE_KEY,
+      'Content-Type': 'application/pdf',
+      'x-upsert': 'true',
+    },
+    body: new Uint8Array(buffer),
   });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase Storage ${res.status}: ${text}`);
+  }
+  return {
+    secure_url: `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${cleanPath}`,
+    public_id: cleanPath,
+  };
 }
 
-export async function uploadBuffer(buffer: Buffer, publicId: string, resourceType: 'auto' | 'raw' | 'image' = 'auto'): Promise<{ secure_url: string; public_id: string }> {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      { public_id: publicId, resource_type: resourceType },
-      (error, result) => {
-        if (error || !result) return reject(error ?? new Error('Upload failed'));
-        resolve({ secure_url: result.secure_url, public_id: result.public_id });
-      }
-    );
-    stream.end(buffer);
-  });
+export async function uploadDocument(
+  buffer: Buffer,
+  filename: string,
+  shipmentId: string,
+): Promise<{ url: string; publicId: string }> {
+  const result = await uploadBuffer(buffer, `shipments/${shipmentId}/${filename}`);
+  return { url: result.secure_url, publicId: result.public_id };
 }
 
 export async function deleteDocument(publicId: string): Promise<void> {
-  await cloudinary.uploader.destroy(publicId, { resource_type: 'raw' });
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  await fetch(`${SUPABASE_URL}/storage/v1/object/${BUCKET}/${publicId}`, {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${SUPABASE_KEY}`,
+      apikey: SUPABASE_KEY,
+    },
+  });
 }
 
 export function getSignedUrl(publicId: string): string {
-  return cloudinary.url(publicId, { sign_url: true, expires_at: Math.floor(Date.now() / 1000) + 3600 });
+  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${publicId}`;
 }

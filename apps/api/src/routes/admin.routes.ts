@@ -2,7 +2,6 @@
 import axios from 'axios';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
-import { v2 as cloudinary } from 'cloudinary';
 import { stripe } from '../integrations/stripe';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/role.middleware';
@@ -11,17 +10,6 @@ import { saveCredentials } from '../utils/credentials-vault';
 import { AppError } from '../utils/AppError';
 
 
-function getCloudinaryStorageMB(u: Record<string, unknown> | null): number | null {
-  const storage = u?.storage as Record<string, unknown> | undefined;
-  const usage = storage?.usage;
-  return typeof usage === 'number' ? Math.round(usage / 1024 / 1024) : null;
-}
-
-function getCloudinaryStorageLimitMB(u: Record<string, unknown> | null): number | null {
-  const storage = u?.storage as Record<string, unknown> | undefined;
-  const limit = storage?.limit;
-  return typeof limit === 'number' ? Math.round(limit / 1024 / 1024) : null;
-}
 
 export const adminRoutes = Router();
 
@@ -57,15 +45,18 @@ adminRoutes.get('/integrations/status', asyncHandler(async (_req, res) => {
     select: { amount: true, currency: true, paidAt: true },
   });
 
-  // Cloudinary
-  let cloudinaryOk = false;
-  let cloudinaryUsage: Record<string, unknown> | null = null;
+  // Supabase Storage
+  let storageOk = false;
+  const supabaseUrl = process.env.SUPABASE_URL ?? '';
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY ?? '';
   try {
-    if (process.env.CLOUDINARY_API_KEY) {
-      cloudinaryUsage = await cloudinary.api.usage() as Record<string, unknown>;
-      cloudinaryOk = true;
+    if (supabaseUrl && supabaseKey) {
+      const r = await fetch(`${supabaseUrl}/storage/v1/bucket/axon-docs`, {
+        headers: { Authorization: `Bearer ${supabaseKey}`, apikey: supabaseKey },
+      });
+      storageOk = r.ok;
     }
-  } catch { /* config missing */ }
+  } catch { /* ignore */ }
 
   const docCount = await prisma.document.count();
 
@@ -85,10 +76,10 @@ adminRoutes.get('/integrations/status', asyncHandler(async (_req, res) => {
       shipengine: { configured: !!process.env.SHIPENGINE_API_KEY },
       stripe:     { ok: stripeOk, mode: stripeMode, configured: !!process.env.STRIPE_SECRET_KEY, lastPayment },
       cloudinary: {
-        configured:    !!process.env.CLOUDINARY_API_KEY,
-        ok:            cloudinaryOk,
-        storageMB:     getCloudinaryStorageMB(cloudinaryUsage),
-        storageLimitMB:getCloudinaryStorageLimitMB(cloudinaryUsage),
+        configured:    !!(supabaseUrl && supabaseKey),
+        ok:            storageOk,
+        storageMB:     null,
+        storageLimitMB:null,
         documentCount: docCount,
       },
     },
