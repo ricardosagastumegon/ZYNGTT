@@ -42,6 +42,14 @@ router.post('/transport/:id', asyncHandler(async (req, res) => {
   res.json({ success: true, data: result });
 }));
 
+// PATCH /api/import/mercancias/:id — Actualizar bultos/tipo por mercancía
+router.patch('/mercancias/:id', asyncHandler(async (req, res) => {
+  const mercancias = req.body.mercancias as unknown[];
+  if (!Array.isArray(mercancias)) throw new Error('mercancias debe ser un array');
+  const result = await importExpedienteService.updateMercancias(req.params.id, mercancias, req.user!.userId);
+  res.json({ success: true, data: result });
+}));
+
 // POST /api/import/generate-docs/:id — Generar PDFs y subir a Cloudinary
 router.post('/generate-docs/:id', asyncHandler(async (req, res) => {
   const result = await importExpedienteService.generateDocuments(req.params.id, req.user!.userId);

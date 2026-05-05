@@ -157,6 +157,32 @@ export const importExpedienteService = {
     }
   },
 
+  async updateMercancias(id: string, mercancias: unknown[], userId: string) {
+    const exp = await prisma.importExpediente.findFirst({ where: { id, userId } });
+    if (!exp) throw new AppError('Expediente no encontrado', 404);
+
+    await prisma.importExpediente.update({
+      where: { id },
+      data: { mercancias: mercancias as object[] },
+    });
+
+    // Sync cantidadBultos + tipoBulto on each SIGIEPermiso
+    await Promise.all(
+      (mercancias as { fraccion: string; cantidadBultos?: number; tipoBulto?: string }[]).map(m => {
+        if (!m.fraccion) return Promise.resolve();
+        return prisma.sIGIEPermiso.updateMany({
+          where: { expedienteId: id, fraccionArancelaria: m.fraccion },
+          data: {
+            cantidadBultos: m.cantidadBultos ?? 1,
+            tipoBulto: m.tipoBulto ?? 'UNIDAD',
+          },
+        });
+      })
+    );
+
+    return prisma.importExpediente.findUnique({ where: { id } });
+  },
+
   async addTransportData(id: string, data: TransportData, userId: string) {
     const exp = await prisma.importExpediente.findFirst({ where: { id, userId } });
     if (!exp) throw new AppError('Expediente no encontrado', 404);

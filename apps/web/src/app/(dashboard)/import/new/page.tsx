@@ -6,10 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import {
   Upload, Truck, FileText, CheckCircle2, ChevronRight, ChevronLeft,
-  AlertCircle, Leaf, Sprout, Loader2, ExternalLink, RefreshCw, Plus, Minus,
+  AlertCircle, Leaf, Sprout, Loader2, ExternalLink, RefreshCw, Plus, Minus, Package,
 } from 'lucide-react';
 
-type WizardStep = 1 | 2 | 3 | 4 | 5 | 6;
+type WizardStep = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 interface MercanciaItem {
   fraccion: string;
@@ -84,16 +84,17 @@ interface Caja { id: string; placa: string; numEconomico?: string; tipo: string 
 
 // ─── Step icons ─────────────────────────────────────────
 const STEPS = [
-  { n: 1, label: 'CFDI',       icon: Upload },
-  { n: 2, label: 'Transporte', icon: Truck },
-  { n: 3, label: 'Documentos', icon: FileText },
-  { n: 4, label: 'Fito MX',   icon: Leaf },
-  { n: 5, label: 'MAGA/SIGIE',icon: Sprout },
-  { n: 6, label: 'Confirmar',  icon: CheckCircle2 },
+  { n: 1, label: 'CFDI',        icon: Upload },
+  { n: 2, label: 'Transporte',  icon: Truck },
+  { n: 3, label: 'Mercancías',  icon: Package },
+  { n: 4, label: 'Documentos',  icon: FileText },
+  { n: 5, label: 'Fito MX',    icon: Leaf },
+  { n: 6, label: 'MAGA/SIGIE', icon: Sprout },
+  { n: 7, label: 'Confirmar',   icon: CheckCircle2 },
 ] as const;
 
 const ADUANAS_GT = ['ADUANA TECUN UMAN II', 'ADUANA TECUN UMAN I', 'ADUANA EL CARMEN'];
-const TIPOS_BULTO = ['CAJA', 'SACO', 'ARPILLA', 'PALLET', 'BULTO', 'CARTÓN'];
+const TIPOS_BULTO = ['A GRANEL', 'CAJAS', 'CARTÓN', 'SACOS', 'ARPILLA', 'PALLET', 'BULTO'];
 
 // ─── Helpers ─────────────────────────────────────────────
 function FL({ htmlFor, children }: { htmlFor?: string; children: React.ReactNode }) {
@@ -185,9 +186,9 @@ export default function NewImportPage() {
   });
   const selectedCaja = cajas.find(c => c.id === transport.cajaId);
 
-  // Initialize SIGIE forms when entering step 5
+  // Initialize SIGIE forms when entering step 6
   useEffect(() => {
-    if (step !== 5 || !preview) return;
+    if (step !== 6 || !preview) return;
     setSigieForms(prev => {
       const next = { ...prev };
       mercancias.forEach(m => {
@@ -298,6 +299,18 @@ export default function NewImportPage() {
     } finally { setLoading(false); }
   }
 
+  async function handleMercanciasSave() {
+    if (!preview) return;
+    setLoading(true); setError('');
+    try {
+      await api.patch(`/api/import/mercancias/${preview.expedienteId}`, { mercancias });
+      setStep(4);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { error?: string } }; message?: string };
+      setError(err.response?.data?.error ?? 'Error al guardar mercancías');
+    } finally { setLoading(false); }
+  }
+
   async function handleGenerateDocs() {
     if (!preview) return;
     setLoading(true); setError('');
@@ -336,7 +349,7 @@ export default function NewImportPage() {
         });
       }
       setFitoUploaded(true);
-      setStep(5);
+      setStep(6);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { error?: string } }; message?: string };
       setError(err.response?.data?.error ?? 'Error al subir fitosanitario');
@@ -376,7 +389,7 @@ export default function NewImportPage() {
           Nueva Importación MX → GT
         </h1>
         <p className="text-sm mt-1 text-gray-500">
-          Completa los 6 pasos para gestionar tu expediente de importación
+          Completa los 7 pasos para gestionar tu expediente de importación
         </p>
       </div>
 
@@ -583,11 +596,114 @@ export default function NewImportPage() {
       )}
 
       {/* ═══════════════════════════════════════════════
-          STEP 3 — Documentos
+          STEP 3 — Mercancías (bultos + tipo presentación)
       ═══════════════════════════════════════════════ */}
       {step === 3 && preview && (
         <div className="rounded-xl border border-gray-100 bg-white p-6 space-y-5">
-          <h2 className="font-semibold text-lg">Paso 3: Generación de Documentos</h2>
+          <div>
+            <h2 className="font-semibold text-lg">Paso 3: Detalles de Mercancías</h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              Indica la cantidad de bultos y el tipo de presentación para cada producto.
+              Estos datos se usarán en el Packing List y la solicitud MAGA/SIGIE.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            {mercancias.map((m, idx) => {
+              const pesoPorBulto = m.cantidadBultos > 0 ? (m.cantidadKG / m.cantidadBultos) : 0;
+              return (
+                <div key={m.fraccion} className="border border-gray-200 rounded-xl overflow-hidden">
+                  {/* Header */}
+                  <div className="bg-gray-50 px-4 py-3 flex items-start justify-between border-b border-gray-100">
+                    <div>
+                      <p className="font-semibold text-gray-800 text-sm">{m.nombre || m.fraccion}</p>
+                      <p className="text-xs text-gray-400 font-mono mt-0.5">{m.fraccion}</p>
+                    </div>
+                    <div className="text-right text-xs text-gray-500">
+                      <p className="font-medium">{m.cantidadKG.toLocaleString()} kg total</p>
+                      <p className="text-gray-400">{m.cantidadBultos} bultos × {pesoPorBulto.toFixed(2)} kg/bulto</p>
+                    </div>
+                  </div>
+
+                  {/* Inputs */}
+                  <div className="px-4 py-4 grid grid-cols-3 gap-4">
+                    {/* Cantidad bultos */}
+                    <div>
+                      <FL>Cantidad de Bultos</FL>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setMercancias(prev => prev.map((x, i) => i === idx ? { ...x, cantidadBultos: Math.max(1, x.cantidadBultos - 1) } : x))}
+                          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600">
+                          <Minus size={13} />
+                        </button>
+                        <input
+                          type="number" min={1}
+                          value={m.cantidadBultos}
+                          onChange={e => setMercancias(prev => prev.map((x, i) => i === idx ? { ...x, cantidadBultos: Math.max(1, Number(e.target.value)) } : x))}
+                          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                        <button
+                          type="button"
+                          onClick={() => setMercancias(prev => prev.map((x, i) => i === idx ? { ...x, cantidadBultos: x.cantidadBultos + 1 } : x))}
+                          className="w-8 h-8 rounded-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 text-gray-600">
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Peso por bulto (calculado) */}
+                    <div>
+                      <FL>Peso por Bulto (kg)</FL>
+                      <div className="border border-gray-100 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-500 font-mono">
+                        {pesoPorBulto.toFixed(2)} kg
+                      </div>
+                      <p className="text-xs text-gray-400 mt-0.5">calculado automáticamente</p>
+                    </div>
+
+                    {/* Tipo presentación — opciones SIGIE */}
+                    <div>
+                      <FL>Tipo de Presentación</FL>
+                      <select
+                        value={m.tipoBulto}
+                        onChange={e => setMercancias(prev => prev.map((x, i) => i === idx ? { ...x, tipoBulto: e.target.value } : x))}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                        {TIPOS_BULTO.map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Preview line */}
+                  <div className="px-4 pb-3">
+                    <div className="rounded-lg bg-indigo-50 px-3 py-2 text-xs text-indigo-700 font-medium">
+                      → {m.cantidadBultos} {m.tipoBulto} · {m.cantidadKG.toLocaleString()} kg total · {pesoPorBulto.toFixed(2)} kg/bulto
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="flex gap-3">
+            <button onClick={() => setStep(2)} className="flex items-center gap-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
+              <ChevronLeft size={15} /> Atrás
+            </button>
+            <button onClick={handleMercanciasSave} disabled={loading}
+              className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+              style={{ background: 'var(--brand-primary)' }}>
+              {loading
+                ? <><Loader2 size={15} className="animate-spin" /> Guardando...</>
+                : 'Guardar y Continuar →'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════
+          STEP 4 — Documentos
+      ═══════════════════════════════════════════════ */}
+      {step === 4 && preview && (
+        <div className="rounded-xl border border-gray-100 bg-white p-6 space-y-5">
+          <h2 className="font-semibold text-lg">Paso 4: Generación de Documentos</h2>
 
           <div className="rounded-lg p-3 text-sm bg-amber-50 border border-amber-100 text-amber-700">
             <p className="font-medium">ℹ️ Estos documentos son necesarios para el SIGIE</p>
@@ -626,10 +742,10 @@ export default function NewImportPage() {
           )}
 
           <div className="flex gap-3">
-            <button onClick={() => setStep(2)} className="flex items-center gap-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
+            <button onClick={() => setStep(3)} className="flex items-center gap-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
               <ChevronLeft size={15} /> Atrás
             </button>
-            <button onClick={() => setStep(4)} disabled={!docs}
+            <button onClick={() => setStep(5)} disabled={!docs}
               className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50"
               style={{ background: 'var(--brand-primary)' }}>
               Continuar →
@@ -639,11 +755,11 @@ export default function NewImportPage() {
       )}
 
       {/* ═══════════════════════════════════════════════
-          STEP 4 — Fito MX
+          STEP 5 — Fito MX
       ═══════════════════════════════════════════════ */}
-      {step === 4 && preview && (
+      {step === 5 && preview && (
         <div className="rounded-xl border border-gray-100 bg-white p-6 space-y-5">
-          <h2 className="font-semibold text-lg">Paso 4: Certificado Fitosanitario México</h2>
+          <h2 className="font-semibold text-lg">Paso 5: Certificado Fitosanitario México</h2>
 
           {/* Fito upload */}
           <div>
@@ -693,7 +809,7 @@ export default function NewImportPage() {
           </div>
 
           <div className="flex gap-3">
-            <button onClick={() => setStep(3)} className="flex items-center gap-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
+            <button onClick={() => setStep(4)} className="flex items-center gap-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
               <ChevronLeft size={15} /> Atrás
             </button>
             <button onClick={handleFitoUpload} disabled={loading}
@@ -706,14 +822,14 @@ export default function NewImportPage() {
       )}
 
       {/* ═══════════════════════════════════════════════
-          STEP 5 — MAGA / SIGIE
+          STEP 6 — MAGA / SIGIE
       ═══════════════════════════════════════════════ */}
-      {step === 5 && preview && (
+      {step === 6 && preview && (
         <div className="space-y-4">
           <div className="rounded-xl border border-gray-100 bg-white px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="font-semibold text-lg">Paso 5: Solicitud MAGA / SIGIE</h2>
+                <h2 className="font-semibold text-lg">Paso 6: Solicitud MAGA / SIGIE</h2>
                 <p className="text-xs text-gray-400 mt-0.5">Completa y envía una solicitud por producto</p>
               </div>
               <button onClick={loadSigieStatuses}
@@ -868,10 +984,10 @@ export default function NewImportPage() {
           })}
 
           <div className="rounded-xl border border-gray-100 bg-white px-6 py-4 flex gap-3">
-            <button onClick={() => setStep(4)} className="flex items-center gap-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
+            <button onClick={() => setStep(5)} className="flex items-center gap-1 px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">
               <ChevronLeft size={15} /> Atrás
             </button>
-            <button onClick={() => setStep(6)} disabled={!allSigieApproved}
+            <button onClick={() => setStep(7)} disabled={!allSigieApproved}
               className="flex-1 py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50"
               style={{ background: 'var(--brand-primary)' }}>
               {allSigieApproved ? 'Continuar →' : `Esperando aprobación SIGIE (${mercancias.filter(m => sigieStatuses[m.fraccion]?.status === 'APROBADO').length}/${mercancias.length})`}
@@ -881,9 +997,9 @@ export default function NewImportPage() {
       )}
 
       {/* ═══════════════════════════════════════════════
-          STEP 6 — Confirmar
+          STEP 7 — Confirmar
       ═══════════════════════════════════════════════ */}
-      {step === 6 && preview && (
+      {step === 7 && preview && (
         <div className="rounded-xl border border-gray-100 bg-white p-6 space-y-5">
           <div className="text-center pb-2">
             <CheckCircle2 className="w-14 h-14 mx-auto mb-3 text-green-500" />
