@@ -352,10 +352,29 @@ export const importExpedienteService = {
   async getFullExpediente(id: string, userId: string) {
     const exp = await prisma.importExpediente.findFirst({
       where: { id, userId },
-      include: { shipment: { select: { reference: true, status: true } } },
+      include: {
+        shipment: { select: { reference: true, status: true } },
+        piloto: true,
+        cabezal: true,
+        caja: true,
+        transporteEmpresa: true,
+        sigiePermisos: true,
+      },
     });
     if (!exp) throw new AppError('Expediente no encontrado', 404);
-    return exp;
+    return {
+      ...exp,
+      transporteEmpresa: exp.transporteEmpresa?.nombre ?? null,
+      transporteCAAT: exp.transporteEmpresa?.CAAT ?? null,
+      pilotoNombre: exp.piloto?.nombre ?? null,
+      pilotoLicencia: exp.piloto?.numLicencia ?? null,
+      cabezalPlaca: exp.cabezal?.placa ?? null,
+      cabezalTarjeta: exp.cabezal?.tarjetaCirculacion ?? null,
+      cabezalMarca: exp.cabezal?.marca ?? null,
+      furgonPlaca: exp.caja?.placa ?? null,
+      furgonTarjeta: exp.caja?.tarjetaCirculacion ?? null,
+      furgonNumEconomico: exp.caja?.numEconomico ?? null,
+    };
   },
 
   async list(userId: string, role: string, page = 1, limit = 20) {
