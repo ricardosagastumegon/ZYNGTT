@@ -1,10 +1,13 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useState } from 'react';
-import { FileText, Truck, Package, Shield, CheckCircle2, XCircle, Clock, Lock } from 'lucide-react';
+import {
+  FileText, Truck, Package, Shield, CheckCircle2, XCircle, Clock, Lock,
+  Pencil, RefreshCw, Save, X, Loader2, AlertCircle,
+} from 'lucide-react';
 
 const STATUS_STEPS = [
   { key: 'CFDI_PENDIENTE',   label: 'CFDI Cargado',    icon: FileText },
@@ -18,6 +21,10 @@ const STATUS_STEPS = [
 ];
 const STATUS_ORDER = STATUS_STEPS.map(s => s.key);
 
+const TIPOS_BULTO = ['A GRANEL', 'CAJAS', 'CARTÓN', 'SACOS', 'ARPILLA', 'PALLET', 'BULTO'];
+const ADUANAS_GT = ['ADUANA TECUN UMAN II', 'ADUANA TECUN UMAN I', 'ADUANA EL CARMEN'];
+const ADUANAS_MX = ['ADUANA SUCHIATE II', 'ADUANA CIUDAD HIDALGO'];
+
 interface SIGIEPermiso {
   id: string;
   producto: string;
@@ -25,6 +32,15 @@ interface SIGIEPermiso {
   permisoFitoNumero?: string;
   dictamenNumero?: string;
   permisoFitoUrl?: string;
+}
+
+interface Mercancia {
+  fraccion: string;
+  nombre?: string;
+  cantidadKG: number;
+  cantidadBultos?: number;
+  tipoBulto?: string;
+  valorUSD?: number;
 }
 
 interface Expediente {
@@ -38,15 +54,27 @@ interface Expediente {
   totalUSD: number;
   pesoTotalKG: number;
   incoterm: string;
-  mercancias: { fraccion: string; nombre?: string; cantidadKG: number }[];
+  mercancias: Mercancia[];
+
+  // Flat transport fields (from backend mapping)
   pilotoNombre?: string;
   pilotoLicencia?: string;
   cabezalPlaca?: string;
   cabezalTarjeta?: string;
+  cabezalMarca?: string;
   furgonPlaca?: string;
   furgonTarjeta?: string;
+  furgonNumEconomico?: string;
   transporteEmpresa?: string;
   transporteCAAT?: string;
+
+  // FK IDs for editing
+  transporteEmpresaId?: string;
+  pilotoId?: string;
+  cabezalId?: string;
+  cajaId?: string;
+  fleteCosto?: number;
+
   cartaPorteMXUrl?: string;
   cartaPorteGTUrl?: string;
   packingListUrl?: string;
@@ -79,10 +107,58 @@ interface ChecklistResult {
   readyForDuca: boolean;
 }
 
+interface TransportEmpresa { id: string; nombre: string; CAAT: string }
+interface Piloto { id: string; nombre: string; numLicencia: string }
+interface Cabezal { id: string; placa: string; marca?: string }
+interface Caja { id: string; placa: string; numEconomico?: string; tipo: string }
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function FL({ children }: { children: React.ReactNode }) {
+  return <label className="block text-xs font-medium text-gray-500 mb-1">{children}</label>;
+}
+function TI({ value, onChange, placeholder, type = 'text' }: {
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+}) {
+  return (
+    <input
+      type={type} value={value} placeholder={placeholder}
+      onChange={e => onChange(e.target.value)}
+      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+    />
+  );
+}
+function SI({ value, onChange, disabled, children }: {
+  value: string; onChange: (v: string) => void; disabled?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <select value={value} onChange={e => onChange(e.target.value)} disabled={disabled}
+      className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:bg-gray-50 disabled:text-gray-400">
+      {children}
+    </select>
+  );
+}
+
+// ─── Component ──────────────────────────────────────────────────────────────
 export default function ExpedienteDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
+
   const [activeTab, setActiveTab] = useState(0);
   const [transmitting, setTransmitting] = useState(false);
+
+  const [editingTransport, setEditingTransport] = useState(false);
+  const [editingMercancias, setEditingMercancias] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [docsStale, setDocsStale] = useState(false);
+  const [err, setErr] = useState('');
+
+  const [tForm, setTForm] = useState({
+    transporteEmpresaId: '', pilotoId: '', cabezalId: '', cajaId: '',
+    aduanaEntradaGT: '', aduanaSalidaMX: '',
+    fechaCruce: '', fleteCosto: '',
+  });
+  const [mForm, setMForm] = useState<Mercancia[]>([]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['expediente', id],
@@ -95,6 +171,105 @@ export default function ExpedienteDetailPage() {
     enabled: !!id,
   });
 
+  // Transport catalogs — only when editing transport
+  const { data: empresas = [] } = useQuery<TransportEmpresa[]>({
+    queryKey: ['transport-empresas'],
+    queryFn: () => api.get('/api/transport/empresas').then(r => r.data.data),
+    enabled: editingTransport,
+  });
+  const { data: pilotos = [] } = useQuery<Piloto[]>({
+    queryKey: ['t-pilotos', tForm.transporteEmpresaId],
+    queryFn: () => api.get(`/api/transport/empresas/${tForm.transporteEmpresaId}/pilotos`).then(r => r.data.data),
+    enabled: editingTransport && !!tForm.transporteEmpresaId,
+  });
+  const { data: cabezales = [] } = useQuery<Cabezal[]>({
+    queryKey: ['t-cabezales', tForm.transporteEmpresaId],
+    queryFn: () => api.get(`/api/transport/empresas/${tForm.transporteEmpresaId}/cabezales`).then(r => r.data.data),
+    enabled: editingTransport && !!tForm.transporteEmpresaId,
+  });
+  const { data: cajas = [] } = useQuery<Caja[]>({
+    queryKey: ['t-cajas', tForm.transporteEmpresaId],
+    queryFn: () => api.get(`/api/transport/empresas/${tForm.transporteEmpresaId}/cajas`).then(r => r.data.data),
+    enabled: editingTransport && !!tForm.transporteEmpresaId,
+  });
+
+  function openTransportEdit() {
+    if (!data) return;
+    setTForm({
+      transporteEmpresaId: data.transporteEmpresaId || '',
+      pilotoId: data.pilotoId || '',
+      cabezalId: data.cabezalId || '',
+      cajaId: data.cajaId || '',
+      aduanaEntradaGT: data.aduanaEntradaGT || 'ADUANA TECUN UMAN II',
+      aduanaSalidaMX: data.aduanaSalidaMX || 'ADUANA SUCHIATE II',
+      fechaCruce: data.fechaCruce ? new Date(data.fechaCruce).toISOString().slice(0, 10) : '',
+      fleteCosto: data.fleteCosto?.toString() || '350',
+    });
+    setEditingTransport(true);
+    setErr('');
+  }
+
+  async function saveTransport() {
+    setSaving(true); setErr('');
+    try {
+      await api.post(`/api/import/transport/${id}`, {
+        transporteEmpresaId: tForm.transporteEmpresaId || undefined,
+        pilotoId: tForm.pilotoId || undefined,
+        cabezalId: tForm.cabezalId || undefined,
+        cajaId: tForm.cajaId || undefined,
+        aduanaEntradaGT: tForm.aduanaEntradaGT || undefined,
+        aduanaSalidaMX: tForm.aduanaSalidaMX || undefined,
+        fechaCruce: tForm.fechaCruce || undefined,
+        fleteCosto: parseFloat(tForm.fleteCosto) || undefined,
+      });
+      await queryClient.invalidateQueries({ queryKey: ['expediente', id] });
+      setEditingTransport(false);
+      if (data?.cartaPorteMXUrl || data?.cartaPorteGTUrl || data?.packingListUrl) setDocsStale(true);
+    } catch (e: unknown) {
+      const ex = e as { response?: { data?: { error?: string } } };
+      setErr(ex.response?.data?.error ?? 'Error al guardar transporte');
+    } finally { setSaving(false); }
+  }
+
+  function openMercanciasEdit() {
+    if (!data) return;
+    setMForm(data.mercancias.map(m => ({
+      fraccion: m.fraccion,
+      nombre: m.nombre,
+      cantidadKG: m.cantidadKG,
+      cantidadBultos: m.cantidadBultos ?? 1,
+      tipoBulto: m.tipoBulto ?? 'CAJAS',
+      valorUSD: m.valorUSD,
+    })));
+    setEditingMercancias(true);
+    setErr('');
+  }
+
+  async function saveMercancias() {
+    setSaving(true); setErr('');
+    try {
+      await api.patch(`/api/import/mercancias/${id}`, { mercancias: mForm });
+      await queryClient.invalidateQueries({ queryKey: ['expediente', id] });
+      setEditingMercancias(false);
+      if (data?.cartaPorteMXUrl || data?.cartaPorteGTUrl || data?.packingListUrl) setDocsStale(true);
+    } catch (e: unknown) {
+      const ex = e as { response?: { data?: { error?: string } } };
+      setErr(ex.response?.data?.error ?? 'Error al guardar mercancías');
+    } finally { setSaving(false); }
+  }
+
+  async function regenerateDocs() {
+    setRegenerating(true); setErr('');
+    try {
+      await api.post(`/api/import/generate-docs/${id}`);
+      await queryClient.invalidateQueries({ queryKey: ['expediente', id] });
+      setDocsStale(false);
+    } catch (e: unknown) {
+      const ex = e as { response?: { data?: { error?: string } } };
+      setErr(ex.response?.data?.error ?? 'Error al regenerar documentos');
+    } finally { setRegenerating(false); }
+  }
+
   if (isLoading) return (
     <div className="flex items-center justify-center h-48">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: 'var(--brand-primary)' }} />
@@ -104,6 +279,10 @@ export default function ExpedienteDetailPage() {
 
   const currentIdx = STATUS_ORDER.indexOf(data.status);
   const isRejected = data.status === 'RECHAZADA' || data.status === 'SEMAFORO_ROJO';
+  const sigieEnviado = (data.sigiePermisos ?? []).some(p =>
+    p.status === 'SOLICITADO' || p.status === 'APROBADO'
+  );
+  const hasDocs = !!(data.cartaPorteMXUrl || data.cartaPorteGTUrl || data.packingListUrl);
 
   const checklist = checklistData;
   const stage1Items = checklist?.items.filter(i => i.stage === 1) ?? [];
@@ -114,14 +293,16 @@ export default function ExpedienteDetailPage() {
     try {
       await api.post(`/api/automation/sat/${id}`);
       refetchChecklist();
-    } catch (e: any) {
-      alert(e?.response?.data?.error ?? 'Error al transmitir DUCA-D');
+    } catch (e: unknown) {
+      const ex = e as { response?: { data?: { error?: string } } };
+      alert(ex.response?.data?.error ?? 'Error al transmitir DUCA-D');
     } finally {
       setTransmitting(false);
     }
   }
 
-  const tabs = ['General', 'Documentos', 'Transporte', 'MAGA/SIGIE', 'SAT', 'Tributos'];
+  const tabs = ['General', 'Documentos', 'Transporte', 'Mercancías', 'MAGA/SIGIE', 'SAT', 'Tributos'];
+  const tipoEmpresa = empresas.find(e => e.id === tForm.transporteEmpresaId);
 
   return (
     <div className="space-y-6">
@@ -144,6 +325,37 @@ export default function ExpedienteDetailPage() {
           {data.status.replace(/_/g, ' ')}
         </span>
       </div>
+
+      {/* Banner: docs stale */}
+      {docsStale && hasDocs && (
+        <div className="flex items-center justify-between gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+          <div className="flex items-center gap-2 text-sm text-amber-800">
+            <AlertCircle size={16} />
+            <span><strong>Datos modificados.</strong> Los documentos generados están desactualizados.</span>
+          </div>
+          <button onClick={regenerateDocs} disabled={regenerating}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-medium hover:bg-amber-700 disabled:opacity-50">
+            {regenerating
+              ? <><Loader2 size={12} className="animate-spin" /> Regenerando...</>
+              : <><RefreshCw size={12} /> Regenerar Documentos</>}
+          </button>
+        </div>
+      )}
+
+      {/* Banner: SIGIE already submitted but data edited */}
+      {sigieEnviado && docsStale && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-orange-50 border border-orange-200 text-sm text-orange-800">
+          <AlertCircle size={16} />
+          <span>⚠️ Solicitud SIGIE ya enviada. Si cambiaron piloto/cabezal/caja, deberás solicitar un nuevo permiso.</span>
+        </div>
+      )}
+
+      {/* Error banner */}
+      {err && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+          <AlertCircle size={16} /> {err}
+        </div>
+      )}
 
       {/* Timeline */}
       <div className="rounded-xl border bg-white p-5" style={{ borderColor: 'var(--color-border)' }}>
@@ -181,10 +393,10 @@ export default function ExpedienteDetailPage() {
 
       {/* Tabs */}
       <div>
-        <div className="flex border-b mb-4" style={{ borderColor: 'var(--color-border)' }}>
+        <div className="flex border-b mb-4 overflow-x-auto" style={{ borderColor: 'var(--color-border)' }}>
           {tabs.map((t, i) => (
             <button key={t} onClick={() => setActiveTab(i)}
-              className={`px-4 py-2 text-sm font-medium border-b-2 transition ${
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
                 activeTab === i ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}>
               {t}
@@ -217,12 +429,10 @@ export default function ExpedienteDetailPage() {
                 ))}
               </div>
 
-              {/* Checklist */}
               {checklist && (
                 <div className="space-y-4 pt-4 border-t" style={{ borderColor: 'var(--color-border)' }}>
                   <h3 className="text-sm font-semibold text-gray-700">Checklist de requisitos</h3>
 
-                  {/* Etapa 1 */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Etapa 1 — Documentos base</span>
@@ -234,13 +444,12 @@ export default function ExpedienteDetailPage() {
                           {item.ok
                             ? <CheckCircle2 size={15} className="text-green-500 flex-shrink-0" />
                             : <XCircle size={15} className="text-red-400 flex-shrink-0" />}
-                          <span style={{ color: item.ok ? 'var(--color-text-primary, #111)' : '#EF4444' }}>{item.item}</span>
+                          <span style={{ color: item.ok ? '#111' : '#EF4444' }}>{item.item}</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* Etapa 2 */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Etapa 2 — Permisos MAGA/SIGIE</span>
@@ -267,7 +476,6 @@ export default function ExpedienteDetailPage() {
                     )}
                   </div>
 
-                  {/* Etapa 3 — DUCA */}
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-xs font-semibold uppercase tracking-wide text-gray-400">Etapa 3 — DUCA-D SAT</span>
@@ -293,6 +501,16 @@ export default function ExpedienteDetailPage() {
           {/* Tab 1 — Documentos */}
           {activeTab === 1 && (
             <div className="space-y-3">
+              {hasDocs && (
+                <div className="flex justify-end mb-2">
+                  <button onClick={regenerateDocs} disabled={regenerating}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 text-xs font-medium disabled:opacity-50">
+                    {regenerating
+                      ? <><Loader2 size={12} className="animate-spin" /> Regenerando...</>
+                      : <><RefreshCw size={12} /> Regenerar Documentos</>}
+                  </button>
+                </div>
+              )}
               {[
                 { label: 'Carta Porte MX',       url: data.cartaPorteMXUrl },
                 { label: 'Carta Porte GT',       url: data.cartaPorteGTUrl },
@@ -313,32 +531,211 @@ export default function ExpedienteDetailPage() {
                     : <span className="text-xs text-gray-400">Pendiente</span>}
                 </div>
               ))}
+              {!hasDocs && (
+                <div className="pt-2">
+                  <button onClick={regenerateDocs} disabled={regenerating || !data.pilotoId || !data.cabezalId || !data.cajaId}
+                    className="w-full py-2.5 rounded-lg text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ background: 'var(--brand-primary)' }}>
+                    {regenerating
+                      ? <><Loader2 size={14} className="animate-spin" /> Generando...</>
+                      : <><FileText size={14} /> Generar Documentos</>}
+                  </button>
+                  {(!data.pilotoId || !data.cabezalId || !data.cajaId) && (
+                    <p className="text-xs text-gray-400 mt-1 text-center">Completa Transporte primero (piloto, cabezal, caja)</p>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
           {/* Tab 2 — Transporte */}
           {activeTab === 2 && (
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                ['Empresa', data.transporteEmpresa],
-                ['CAAT', data.transporteCAAT],
-                ['Piloto', data.pilotoNombre],
-                ['Licencia', data.pilotoLicencia],
-                ['Cabezal Placa', data.cabezalPlaca],
-                ['Cabezal Tarjeta', data.cabezalTarjeta],
-                ['Furgón Placa', data.furgonPlaca],
-                ['Furgón Tarjeta', data.furgonTarjeta],
-              ].map(([l, v]) => (
-                <div key={l}>
-                  <p className="text-xs font-medium" style={{ color: 'var(--color-text-tertiary)' }}>{l}</p>
-                  <p className="text-sm font-medium mt-0.5 font-mono">{v ?? '—'}</p>
+            <div>
+              <div className="flex justify-end mb-3">
+                {!editingTransport ? (
+                  <button onClick={openTransportEdit}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-xs font-medium text-gray-700">
+                    <Pencil size={12} /> Editar
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditingTransport(false)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-xs font-medium text-gray-700">
+                      <X size={12} /> Cancelar
+                    </button>
+                    <button onClick={saveTransport} disabled={saving}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs font-medium disabled:opacity-50"
+                      style={{ background: 'var(--brand-primary)' }}>
+                      {saving ? <><Loader2 size={12} className="animate-spin" /> Guardando</> : <><Save size={12} /> Guardar</>}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {!editingTransport ? (
+                <div className="grid grid-cols-2 gap-4">
+                  {[
+                    ['Empresa', data.transporteEmpresa],
+                    ['CAAT', data.transporteCAAT],
+                    ['Piloto', data.pilotoNombre],
+                    ['Licencia', data.pilotoLicencia],
+                    ['Cabezal Placa', data.cabezalPlaca],
+                    ['Cabezal Tarjeta', data.cabezalTarjeta],
+                    ['Furgón Placa', data.furgonPlaca],
+                    ['Furgón Tarjeta', data.furgonTarjeta],
+                    ['Aduana Salida MX', data.aduanaSalidaMX],
+                    ['Aduana Entrada GT', data.aduanaEntradaGT],
+                    ['Fecha Cruce', data.fechaCruce ? new Date(data.fechaCruce).toLocaleDateString('es-GT') : null],
+                    ['Costo Flete USD', data.fleteCosto ? `$${data.fleteCosto.toLocaleString()}` : null],
+                  ].map(([l, v]) => (
+                    <div key={l}>
+                      <p className="text-xs font-medium" style={{ color: 'var(--color-text-tertiary)' }}>{l}</p>
+                      <p className="text-sm font-medium mt-0.5 font-mono">{v ?? '—'}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <FL>Empresa Transportista</FL>
+                    <SI value={tForm.transporteEmpresaId}
+                      onChange={v => setTForm(p => ({ ...p, transporteEmpresaId: v, pilotoId: '', cabezalId: '', cajaId: '' }))}>
+                      <option value="">Seleccionar empresa...</option>
+                      {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                    </SI>
+                    {tipoEmpresa && (
+                      <p className="text-xs text-indigo-600 mt-1 font-mono">CAAT: {tipoEmpresa.CAAT}</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <FL>Piloto</FL>
+                      <SI value={tForm.pilotoId} onChange={v => setTForm(p => ({ ...p, pilotoId: v }))} disabled={!tForm.transporteEmpresaId}>
+                        <option value="">Seleccionar...</option>
+                        {pilotos.map(p => <option key={p.id} value={p.id}>{p.nombre} — {p.numLicencia}</option>)}
+                      </SI>
+                    </div>
+                    <div>
+                      <FL>Cabezal</FL>
+                      <SI value={tForm.cabezalId} onChange={v => setTForm(p => ({ ...p, cabezalId: v }))} disabled={!tForm.transporteEmpresaId}>
+                        <option value="">Seleccionar...</option>
+                        {cabezales.map(c => <option key={c.id} value={c.id}>{c.placa}{c.marca ? ` — ${c.marca}` : ''}</option>)}
+                      </SI>
+                    </div>
+                    <div>
+                      <FL>Caja / Furgón</FL>
+                      <SI value={tForm.cajaId} onChange={v => setTForm(p => ({ ...p, cajaId: v }))} disabled={!tForm.transporteEmpresaId}>
+                        <option value="">Seleccionar...</option>
+                        {cajas.map(c => <option key={c.id} value={c.id}>{c.placa}{c.numEconomico ? ` — #${c.numEconomico}` : ''} ({c.tipo})</option>)}
+                      </SI>
+                    </div>
+                    <div>
+                      <FL>Fecha de Cruce</FL>
+                      <TI value={tForm.fechaCruce} onChange={v => setTForm(p => ({ ...p, fechaCruce: v }))} type="date" />
+                    </div>
+                    <div>
+                      <FL>Aduana Salida (MX)</FL>
+                      <SI value={tForm.aduanaSalidaMX} onChange={v => setTForm(p => ({ ...p, aduanaSalidaMX: v }))}>
+                        {ADUANAS_MX.map(a => <option key={a}>{a}</option>)}
+                      </SI>
+                    </div>
+                    <div>
+                      <FL>Aduana Entrada (GT)</FL>
+                      <SI value={tForm.aduanaEntradaGT} onChange={v => setTForm(p => ({ ...p, aduanaEntradaGT: v }))}>
+                        {ADUANAS_GT.map(a => <option key={a}>{a}</option>)}
+                      </SI>
+                    </div>
+                    <div>
+                      <FL>Costo del Flete (USD)</FL>
+                      <TI value={tForm.fleteCosto} onChange={v => setTForm(p => ({ ...p, fleteCosto: v }))} type="number" placeholder="350" />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Tab 3 — MAGA/SIGIE */}
+          {/* Tab 3 — Mercancías */}
           {activeTab === 3 && (
+            <div>
+              <div className="flex justify-end mb-3">
+                {!editingMercancias ? (
+                  <button onClick={openMercanciasEdit}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-xs font-medium text-gray-700">
+                    <Pencil size={12} /> Editar Bultos / Tipo
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditingMercancias(false)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-xs font-medium text-gray-700">
+                      <X size={12} /> Cancelar
+                    </button>
+                    <button onClick={saveMercancias} disabled={saving}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-white text-xs font-medium disabled:opacity-50"
+                      style={{ background: 'var(--brand-primary)' }}>
+                      {saving ? <><Loader2 size={12} className="animate-spin" /> Guardando</> : <><Save size={12} /> Guardar</>}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {(editingMercancias ? mForm : data.mercancias).map((m, idx) => {
+                  const bultos = m.cantidadBultos ?? 1;
+                  const tipo = m.tipoBulto ?? 'CAJAS';
+                  const pesoPorBulto = bultos > 0 ? m.cantidadKG / bultos : 0;
+                  return (
+                    <div key={`${m.fraccion}-${idx}`} className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3 flex items-start justify-between border-b border-gray-100">
+                        <div>
+                          <p className="font-semibold text-gray-800 text-sm">{m.nombre || m.fraccion}</p>
+                          <p className="text-xs text-gray-400 font-mono mt-0.5">{m.fraccion}</p>
+                        </div>
+                        <div className="text-right text-xs text-gray-500">
+                          <p className="font-medium">{m.cantidadKG.toLocaleString()} kg total</p>
+                          {m.valorUSD != null && (
+                            <p className="text-gray-400">${m.valorUSD.toLocaleString()} USD</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="px-4 py-4 grid grid-cols-3 gap-4">
+                        <div>
+                          <FL>Cantidad Bultos</FL>
+                          {editingMercancias ? (
+                            <input type="number" min={1} value={bultos}
+                              onChange={e => setMForm(prev => prev.map((x, i) => i === idx ? { ...x, cantidadBultos: Math.max(1, Number(e.target.value)) } : x))}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+                          ) : (
+                            <p className="text-sm font-medium font-mono">{bultos}</p>
+                          )}
+                        </div>
+                        <div>
+                          <FL>Peso por Bulto</FL>
+                          <p className="text-sm font-medium font-mono text-gray-600">{pesoPorBulto.toFixed(2)} kg</p>
+                          <p className="text-xs text-gray-400">calculado</p>
+                        </div>
+                        <div>
+                          <FL>Tipo Presentación</FL>
+                          {editingMercancias ? (
+                            <select value={tipo}
+                              onChange={e => setMForm(prev => prev.map((x, i) => i === idx ? { ...x, tipoBulto: e.target.value } : x))}
+                              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                              {TIPOS_BULTO.map(t => <option key={t} value={t}>{t}</option>)}
+                            </select>
+                          ) : (
+                            <p className="text-sm font-medium">{tipo}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Tab 4 — MAGA/SIGIE */}
+          {activeTab === 4 && (
             <div className="space-y-3">
               <div className="p-3 rounded-lg border" style={{ borderColor: 'var(--color-border)' }}>
                 <p className="text-xs font-medium mb-1" style={{ color: 'var(--color-text-tertiary)' }}>Estado SIGIE</p>
@@ -376,8 +773,8 @@ export default function ExpedienteDetailPage() {
             </div>
           )}
 
-          {/* Tab 4 — SAT */}
-          {activeTab === 4 && (
+          {/* Tab 5 — SAT */}
+          {activeTab === 5 && (
             <div className="space-y-3">
               {[
                 ['No. DUCA-D', data.ducaDNumero],
@@ -391,8 +788,8 @@ export default function ExpedienteDetailPage() {
             </div>
           )}
 
-          {/* Tab 5 — Tributos */}
-          {activeTab === 5 && (
+          {/* Tab 6 — Tributos */}
+          {activeTab === 6 && (
             <div className="space-y-2">
               {[
                 ['Valor CIF (USD)', `$${data.cifUSD?.toFixed(2) ?? '—'}`],
